@@ -34,7 +34,7 @@ import 'dart:convert';
 import '../services/diagnostics.dart';
 import '../utils/app_failure.dart';
 
-/// Perfil local (nombre + foto) y toda la configuración de la app.
+/// Identidad del lector y toda la configuración de la app.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -45,6 +45,9 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _editDisplayName() async {
     final profile = context.read<ProfileProvider>();
+    if (profile.usesMyAnimeListIdentity) {
+      return;
+    }
     final controller = TextEditingController(text: profile.displayName);
     final next = await showDialog<String>(
       context: context,
@@ -428,13 +431,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'Novedades 2.3.1',
+                  'Novedades 2.3.2',
                   style: theme.textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
+                  '• Perfil automático con tu usuario de MyAnimeList.\n'
                   '• Vincula mangas a MyAnimeList y sincroniza tu lectura.\n'
                   '• Reparación de descargas y capítulos en otras fuentes.\n'
                   '• Novedades, lectura preparada y copias automáticas.\n'
@@ -475,8 +479,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ListTile(
             leading: const Icon(Icons.sync_alt),
             title: const Text('MyAnimeList · Manga'),
-            subtitle: const Text(
-              'Conectar cuenta, buscar por nombre o ID y enviar progreso',
+            subtitle: Text(
+              profile.usesMyAnimeListIdentity
+                  ? 'Conectado como @${profile.myAnimeListUsername}'
+                  : 'Conectar cuenta, buscar por nombre o ID y enviar progreso',
             ),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const MyAnimeListScreen()),
@@ -577,7 +583,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Nombre',
+                        profile.usesMyAnimeListIdentity
+                            ? 'Nombre de MyAnimeList'
+                            : 'Nombre',
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: theme.colorScheme.onSurface.withAlpha(150),
                           fontWeight: FontWeight.w600,
@@ -585,7 +593,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const SizedBox(height: 4),
                       InkWell(
-                        onTap: () => unawaited(_editDisplayName()),
+                        onTap: profile.usesMyAnimeListIdentity
+                            ? null
+                            : () => unawaited(_editDisplayName()),
                         borderRadius: BorderRadius.circular(8),
                         child: Row(
                           children: [
@@ -600,18 +610,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            Icon(
-                              Icons.edit_rounded,
-                              size: 18,
-                              color: theme.colorScheme.onSurface.withAlpha(140),
-                            ),
+                            if (!profile.usesMyAnimeListIdentity) ...[
+                              const SizedBox(width: 6),
+                              Icon(
+                                Icons.edit_rounded,
+                                size: 18,
+                                color: theme.colorScheme.onSurface.withAlpha(
+                                  140,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
+                      if (profile.usesMyAnimeListIdentity) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '@${profile.myAnimeListUsername} · MyAnimeList',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withAlpha(170),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 6),
                       Text(
-                        'Toca la foto o el nombre para editarlos.',
+                        profile.usesMyAnimeListIdentity
+                            ? 'El nombre se toma de MyAnimeList. Toca la foto para editarla.'
+                            : 'Toca la foto o el nombre para editarlos.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurface.withAlpha(140),
                           fontWeight: FontWeight.w600,

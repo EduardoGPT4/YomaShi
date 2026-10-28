@@ -18,6 +18,8 @@ Aplicación Flutter para explorar, descargar y leer manga desde InManga, MangaDe
 
 Desde Perfil → MyAnimeList · Manga conecta la cuenta en el navegador. Para sincronizar un manga concreto, abre su ficha o el menú del lector, busca la obra y confirma el vínculo. Activa «Enviar progreso al terminar capítulos» si quieres sincronización automática. La aplicación conserva los envíos pendientes sin conexión y permite reintentarlos; solo envía capítulos con número entero conocido y no reduce el progreso existente. Las copias guardan los vínculos, pero no las credenciales.
 
+El perfil muestra automáticamente el nombre y `@usuario` de la cuenta MAL conectada. Se conserva entre aperturas y sin conexión; al desconectar vuelve a mostrarse el nombre local anterior.
+
 La conexión requiere el servicio de `server/` instalado en el alojamiento privado de YomaTV. `python tools/install_mal_backend.py --web-root RUTA_A_YOMATVWEB` prepara la extensión en su código existente; después se publica con el procedimiento de releases del sitio. Usa el callback registrado del sitio y mantiene el secreto de cliente y los tokens de MAL en el servidor cifrados; Android guarda una credencial de dispositivo cifrada con Android Keystore. No incluyas secretos de configuración ni claves de firma en GitHub. El servidor necesita HTTPS, PHP con OpenSSL y cURL, y acceso a su base de datos. Referencia: [API de MyAnimeList](https://myanimelist.net/apiconfig/references/api/v2).
 
 Documentación:
@@ -38,7 +40,7 @@ Entorno de validación: Flutter 3.47.5 estable, Dart 3.13.4, JDK 17. El SDK mín
 
 El APK de desarrollo se genera en build/app/outputs/flutter-apk/app-debug.apk. La validación automatizada está en .github/workflows/flutter.yml.
 
-Para uso personal, el APK ARM64 optimizado se compila con `flutter build apk --release --target-platform android-arm64 --split-per-abi --dart-define=YOMASHI_PERSONAL_RELEASE=true`. Este indicador explícito conserva el certificado de depuración existente para permitir actualizar la instalación actual. Conserva ese keystore para futuras actualizaciones. Flutter añade un desplazamiento por ABI al código de versión: el APK ARM64 de 2.3.1+5 utiliza 2005. Las siguientes actualizaciones deben usar el mismo comando y aumentar el número de compilación; evita sustituirlo por un APK universal con un código inferior.
+Para uso personal, el APK ARM64 optimizado se compila con `flutter build apk --release --target-platform android-arm64 --split-per-abi --dart-define=YOMASHI_PERSONAL_RELEASE=true`. Este indicador explícito conserva el certificado de depuración existente para permitir actualizar la instalación actual. Conserva ese keystore para futuras actualizaciones. Flutter añade un desplazamiento por ABI al código de versión: el APK ARM64 de 2.3.2+6 utiliza 2006. Las siguientes actualizaciones deben usar el mismo comando y aumentar el número de compilación; evita sustituirlo por un APK universal con un código inferior.
 
 Para otra firma, configura android/key.properties o las variables YOMASHI_KEYSTORE, YOMASHI_STORE_PASSWORD, YOMASHI_KEY_ALIAS y YOMASHI_KEY_PASSWORD. Las credenciales se excluyen del control de versiones. Sin firma ni indicador personal explícito, release falla.
 

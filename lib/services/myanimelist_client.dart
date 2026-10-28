@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class MalFailure implements Exception {
@@ -100,6 +101,8 @@ class MalManga {
 }
 
 class MyAnimeListClient {
+  /// Signals committed credential changes without exposing the device token.
+  final sessionChanges = ValueNotifier<int>(0);
   static final endpoint = Uri.parse(
     'https://hk-br035.gt.tc/seasonav1/yomashi-api.php',
   );
@@ -108,6 +111,7 @@ class MyAnimeListClient {
   final MalCredentialStore credentials;
   final Future<String> Function(List<String>) solveHostCookie;
   String? _cookie;
+  Future<Map<String, dynamic>?>? _accountRequest;
   MyAnimeListClient({
     Uri? api,
     HttpClient? http,
@@ -243,10 +247,12 @@ class MyAnimeListClient {
         }
         if (response.statusCode < 200 || response.statusCode >= 300) {
           if (response.statusCode == 401 && !anonymous) {
-            await credentials.replaceIfToken(
+            if (await credentials.replaceIfToken(
               auth!['device_token'] as String?,
               null,
-            );
+            )) {
+              sessionChanges.value++;
+            }
           }
           throw MalFailure(
             data['error'] is String
@@ -306,10 +312,17 @@ class MyAnimeListClient {
         409,
       );
     }
+    sessionChanges.value++;
     return value;
   }
 
-  Future<Map<String, dynamic>?> account() async {
+  Future<Map<String, dynamic>?> account() {
+    return _accountRequest ??= _loadAccount().whenComplete(
+      () => _accountRequest = null,
+    );
+  }
+
+  Future<Map<String, dynamic>?> _loadAccount() async {
     final auth = await credentials.load();
     if (auth == null) return null;
     final status = await _requestWithSession({'action': 'status'}, auth);
@@ -327,6 +340,7 @@ class MyAnimeListClient {
         409,
       );
     }
+    sessionChanges.value++;
     return next;
   }
 
@@ -334,7 +348,12 @@ class MyAnimeListClient {
     // Revoke remotely before forgetting the credential; allow retry on network error.
     final auth = await credentials.load();
     await _requestWithSession({'action': 'disconnect'}, auth);
-    await credentials.replaceIfToken(auth!['device_token'] as String?, null);
+    if (await credentials.replaceIfToken(
+      auth!['device_token'] as String?,
+      null,
+    )) {
+      sessionChanges.value++;
+    }
   }
 
   Future<List<MalManga>> search(String query) async {

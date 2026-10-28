@@ -1,4 +1,4 @@
-# YomaShi 2.3.1 — MyAnimeList para manga
+# YomaShi 2.3.2 — MyAnimeList para manga
 
 ## Uso
 
@@ -11,6 +11,7 @@
 - La lectura local se guarda aunque la red falle. Los trabajos pendientes usan reintentos limitados y pueden reenviarse manualmente desde la pantalla MAL. No se envían trabajos de otra cuenta ni de un vínculo reemplazado.
 - Desmarcar un capítulo local no reduce el contador remoto; puedes corregirlo manualmente en MAL.
 - Las copias v4 incluyen vínculos por cuenta. La restauración sigue aceptando las versiones 1, 2 y 3. Las credenciales no se exportan.
+- Desde 2.3.2, el perfil utiliza el nombre de la cuenta MAL conectada como nombre visible y `@usuario`. Se actualiza al autorizar, cambiar o desconectar la cuenta, y se conserva sin conexión mediante la sesión cifrada existente. El nombre local previo se recupera al desconectar y sigue siendo el que se guarda en las copias portables.
 
 ## Servidor y despliegue
 
@@ -48,5 +49,7 @@ La autorización de una cuenta personal se completa desde el navegador al conect
 Validación del 27 de octubre de 2026: 120 pruebas locales aprobadas, análisis estático sin incidencias y prueba voluntaria contra el servidor real aprobada (conexión pendiente, estado y revocación). Se verificó además el formulario de vinculación, CSRF, PKCE y la redirección a la aplicación MAL registrada. El release web activo es `yomashi-authorize-20261027-1`; sus 131 archivos se comprobaron antes de la activación. El APK ARM64 2.3.1 usa código de versión 2005 y conserva el certificado de la instalación personal anterior.
 
 La regresión adicional de Chromium reprodujo el bloqueo con la política anterior y aprobó con la corrección, tanto en la prueba local como en el sitio publicado: clic real, POST 303, solicitud al destino MAL y ausencia de errores CSP. Se revocaron las conexiones de prueba y se retiraron los auxiliares temporales del despliegue.
+
+Validación de 2.3.2: 131 pruebas de Flutter aprobadas y análisis sin incidencias. Incluye perfil cacheado, modo sin conexión, inicio y cierre de sesión, revocación, cambio de cuenta, lecturas tardías y descarte de actualizaciones después de cerrar el perfil. La interfaz se probó a 320 píxeles con texto ampliado. El APK ARM64 utiliza código 2006 y el certificado personal anterior.
 
 Referencias oficiales: [OAuth de MyAnimeList](https://myanimelist.net/apiconfig/references/authorization), [API v2](https://myanimelist.net/apiconfig/references/api/v2).

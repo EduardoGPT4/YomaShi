@@ -369,6 +369,7 @@ class _AppLifecycleHostState extends State<_AppLifecycleHost>
     final downloader = context.read<DownloadQueueProvider>();
     switch (state) {
       case AppLifecycleState.resumed:
+        unawaited(context.read<ProfileProvider>().refreshMyAnimeList());
         unawaited(MyAnimeListService.shared.flush().catchError((_) {}));
         unawaited(StartupStorage.ensureFolderAndDefaults(context));
         unawaited(downloader.checkForRetryableJobs());

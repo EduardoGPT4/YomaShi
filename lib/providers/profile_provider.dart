@@ -1,22 +1,94 @@
 import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../utils/preferences.dart';
+import '../services/myanimelist_client.dart';
+import '../services/myanimelist_service.dart';
 
-/// Perfil local: nombre y foto (sin cuenta remota).
+/// MAL provides the visible identity while connected; the local name is retained.
 class ProfileProvider extends ChangeNotifier {
   static const defaultDisplayName = 'Lector';
+  final MyAnimeListClient _malClient;
+  ProfileProvider({MyAnimeListClient? malClient})
+    : _malClient = malClient ?? MyAnimeListService.shared.client {
+    _malClient.sessionChanges.addListener(_onSessionChanged);
+  }
 
   String _displayName = defaultDisplayName;
   String? _avatarPath;
   bool _loaded = false;
+  bool _disposed = false;
+  int _identityGeneration = 0;
+  int? _malUserId;
+  String? _malUsername;
+  Future<void>? _refreshingAccount;
 
-  String get displayName => _displayName;
+  String get displayName => _malUsername ?? _displayName;
+  String? get myAnimeListUsername => _malUsername;
+  bool get usesMyAnimeListIdentity => _malUsername != null;
   String? get avatarPath => _avatarPath;
   bool get isLoaded => _loaded;
+
+  void _onSessionChanged() => unawaited(reloadMyAnimeListIdentity());
+
+  /// Only reads encrypted local credentials; safe to call without a network.
+  Future<void> reloadMyAnimeListIdentity() async {
+    if (_disposed) return;
+    final generation = ++_identityGeneration;
+    Map<String, dynamic>? auth;
+    try {
+      auth = await _malClient.credentials.load();
+    } catch (_) {
+      return;
+    }
+    if (_disposed || generation != _identityGeneration) return;
+    final profile = auth?['profile'];
+    final id = profile is Map ? profile['id'] : null;
+    final name = profile is Map ? profile['name'] : null;
+    final connected =
+        auth?['connected'] == true &&
+        id is int &&
+        id > 0 &&
+        name is String &&
+        name.trim().isNotEmpty;
+    final nextName = connected ? name.trim() : null;
+    final nextId = connected ? id : null;
+    if (_malUsername == nextName && _malUserId == nextId) return;
+    _malUsername = nextName;
+    _malUserId = nextId;
+    notifyListeners();
+  }
+
+  /// Refreshes session status without hiding the cached identity while offline.
+  Future<void> refreshMyAnimeList() {
+    if (_disposed) return Future.value();
+    return _refreshingAccount ??= _refreshMyAnimeList().whenComplete(
+      () => _refreshingAccount = null,
+    );
+  }
+
+  Future<void> _refreshMyAnimeList() async {
+    await reloadMyAnimeListIdentity();
+    if (_disposed) return;
+    try {
+      await _malClient.account();
+    } catch (_) {
+      // A 401 clears credentials in the client. Network failures preserve them.
+    }
+    await reloadMyAnimeListIdentity();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _identityGeneration++;
+    _malClient.sessionChanges.removeListener(_onSessionChanged);
+    super.dispose();
+  }
 
   bool get hasAvatar {
     final path = _avatarPath;
@@ -29,6 +101,7 @@ class ProfileProvider extends ChangeNotifier {
   Future<void> load() async {
     final name = await PreferencesService.getProfileDisplayName();
     final avatar = await PreferencesService.getProfileAvatarPath();
+    if (_disposed) return;
     _displayName = (name == null || name.trim().isEmpty)
         ? defaultDisplayName
         : name.trim();
@@ -38,7 +111,10 @@ class ProfileProvider extends ChangeNotifier {
       await PreferencesService.setProfileAvatarPath(null);
     }
     _loaded = true;
+    await reloadMyAnimeListIdentity();
+    if (_disposed) return;
     notifyListeners();
+    unawaited(refreshMyAnimeList());
   }
 
   Future<void> setDisplayName(String name) async {
