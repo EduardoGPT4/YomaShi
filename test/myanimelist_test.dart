@@ -316,9 +316,9 @@ void main() {
         },
       );
       respond = (r) async {
-        final m =
-            jsonDecode(await utf8.decoder.bind(r).join())
-                as Map<String, dynamic>;
+        final body = await utf8.decoder.bind(r).join();
+        expect(r.headers.contentLength, utf8.encode(body).length);
+        final m = jsonDecode(body) as Map<String, dynamic>;
         requests.add(m);
         expect(r.headers.value('authorization'), 'Bearer ${'a' * 64}');
         r.response.headers.contentType = ContentType.json;
@@ -333,7 +333,13 @@ void main() {
         );
         await r.response.close();
       };
-      server.listen((r) async => respond(r));
+      server.listen((r) async {
+        expect(r.headers.value('X-YomaShi-Token'), 'a' * 64);
+        expect(r.headers.contentLength, greaterThan(0));
+        expect(r.headers.value(HttpHeaders.transferEncodingHeader), isNull);
+        expect(r.persistentConnection, isFalse);
+        await respond(r);
+      });
     });
     tearDown(() async {
       raw.close(force: true);
@@ -368,6 +374,13 @@ void main() {
           throwsA(isA<MalFailure>()),
         );
         expect(requests, hasLength(1));
+      },
+    );
+    test(
+      'UTF-8 manga names use the encoded byte count for Content-Length',
+      () async {
+        expect((await client.search('ベルセルク')).single.id, 2);
+        expect(requests.single['query'], 'ベルセルク');
       },
     );
     test('expired authorization forgets the local credential', () async {

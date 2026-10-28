@@ -14,6 +14,13 @@ try {
   if(!is_array($input)) throw new WebError('Solicitud inválida.');
   $authorization=(string)($_SERVER['HTTP_AUTHORIZATION']??$_SERVER['REDIRECT_HTTP_AUTHORIZATION']??'');
   $bearer=str_starts_with($authorization,'Bearer ')?substr($authorization,7):'';
+  // This host strips Authorization before PHP. Use a dedicated HTTPS header,
+  // while rejecting conflicting credentials on hosts that forward both.
+  $deviceHeader=(string)($_SERVER['HTTP_X_YOMASHI_TOKEN']??'');
+  if($deviceHeader!=='') {
+    if($bearer!=='' && !hash_equals($bearer,$deviceHeader)) throw new WebError('Credenciales de dispositivo incompatibles.',401);
+    $bearer=$deviceHeader;
+  }
   if(session_status()===PHP_SESSION_ACTIVE) session_write_close();
   echo json_encode(ys_dispatch(db(),$input,$bearer),JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE);
 } catch(WebError $e) { http_response_code($e->status);echo json_encode(['error'=>$e->getMessage()]); }

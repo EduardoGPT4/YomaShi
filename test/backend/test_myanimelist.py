@@ -62,11 +62,12 @@ class TestMangaBridge(unittest.TestCase):
     def tearDownClass(cls):
         cls.php.terminate();cls.php.wait(timeout=10);cls.mock.shutdown();cls.mock.server_close();cls.log.close()
         cls.temp.cleanup()
-    def request(self,path='yomashi-api.php',payload=None,token=None,form=False):
+    def request(self,path='yomashi-api.php',payload=None,token=None,form=False,token_header=False,extra_headers=None):
         data=None;headers={}
         if payload is not None:
             data=(urllib.parse.urlencode(payload) if form else json.dumps(payload)).encode();headers['Content-Type']='application/x-www-form-urlencoded' if form else 'application/json'
-        if token:headers['Authorization']='Bearer '+token
+        if token:headers['X-YomaShi-Token' if token_header else 'Authorization']=token if token_header else 'Bearer '+token
+        if extra_headers:headers.update(extra_headers)
         request=urllib.request.Request(self.base+path,data=data,headers=headers)
         try:r=self.opener.open(request,timeout=10)
         except urllib.error.HTTPError as e:r=e
@@ -76,6 +77,8 @@ class TestMangaBridge(unittest.TestCase):
         code,raw,_=self.request(payload={'action':'start'});self.assertEqual(code,200,raw)
         pair=json.loads(raw);token=pair['device_token'];device=pair['device_id']
         self.assertNotIn('client_secret',raw.decode());self.assertNotIn('access_token',raw.decode())
+        self.assertEqual(self.request(payload={'action':'status'},token=token,token_header=True)[0],200)
+        self.assertEqual(self.request(payload={'action':'status'},token=token,extra_headers={'X-YomaShi-Token':'b'*64})[0],401)
         self.assertEqual(self.request(payload={'action':'status'})[0],401)
         self.assertEqual(self.request()[0],405)
         status,raw,_=self.request('yomashi-connect.php?device='+device);self.assertEqual(status,200)

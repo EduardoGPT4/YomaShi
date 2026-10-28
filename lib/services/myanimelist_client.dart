@@ -181,17 +181,26 @@ class MyAnimeListClient {
         }
         final req = await http.postUrl(api);
         req.followRedirects = false;
+        // The host may answer its cookie challenge before reading a chunked
+        // request. Send a fixed-size body and avoid reusing that connection.
+        req.persistentConnection = false;
         req.headers.contentType = ContentType.json;
         if (auth != null) {
           req.headers.set(
             HttpHeaders.authorizationHeader,
             'Bearer ${auth['device_token']}',
           );
+          // The shared hosting proxy strips Authorization before PHP.
+          req.headers.set('X-YomaShi-Token', auth['device_token']);
         }
         if (_cookie != null) {
           req.headers.set(HttpHeaders.cookieHeader, '__test=$_cookie');
         }
-        req.write(jsonEncode({...input, 'owner_id': ?expectedOwner}));
+        final body = utf8.encode(
+          jsonEncode({...input, 'owner_id': ?expectedOwner}),
+        );
+        req.contentLength = body.length;
+        req.add(body);
         final response = await req.close().timeout(const Duration(seconds: 70));
         final bytes = <int>[];
         await for (final chunk in response.timeout(
