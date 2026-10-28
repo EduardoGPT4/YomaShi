@@ -33,14 +33,20 @@ El despliegue inicial por FTPS se detuvo por un certificado vencido. La publicac
 
 La versión 2.3.1 adapta las peticiones al alojamiento real: envía la credencial de dispositivo también en `X-YomaShi-Token`, porque el servidor elimina `Authorization`. El backend rechaza cabeceras que contengan credenciales diferentes. El cliente envía JSON UTF-8 con longitud explícita y cierra cada conexión HTTP para evitar respuestas malformadas del proxy.
 
+El botón de autorización requiere además permitir el destino de la redirección en `form-action`. La página de conexión conserva la política del sitio y añade únicamente `https://myanimelist.net` a esa directiva. Esto corrige el bloqueo silencioso de Chromium al seguir el POST hacia MAL y se aplica en el servidor, sin reinstalar el APK.
+
 ## Verificación
 
 Las pruebas de Flutter cubren búsquedas por nombre/ID/URL, estados, validación, cola sin conexión, reintentos, alias de capítulos locales y remotos, cambio de cuenta, respuestas antiguas, envíos concurrentes, capítulos especiales y backups sin credenciales. Las pruebas HTTP ejecutan los endpoints PHP con un proveedor MAL local: sesión, CSRF, PKCE, callback, cifrado, tokens de renovación rotativos, actualizaciones PATCH y límites de progreso. No modifican ninguna cuenta MAL real.
 
 La prueba de conexión real puede ejecutarse de forma voluntaria con `flutter test test/myanimelist_live_test.dart --dart-define=YOMASHI_LIVE_MAL=true`. Requiere PHP local para reproducir la operación AES del puente Android. Crea y revoca su propia conexión pendiente; no autoriza ninguna cuenta MAL ni modifica listas. Las pruebas habituales omiten esta petición externa.
 
+La regresión del botón se prueba también en un perfil nuevo de Chrome: con Node.js, Playwright y Chrome disponibles, ejecutar `test/backend/test_myanimelist.py` con `YOMASHI_BROWSER_TESTS=1`. `PLAYWRIGHT_MODULE` permite indicar la ruta de Playwright si no está instalado en el proyecto. La prueba hace clic en el formulario y comprueba que Chromium solicita la navegación a MAL; una respuesta HTTP 303 por sí sola no detecta este fallo de CSP.
+
 La autorización de una cuenta personal se completa desde el navegador al conectar MyAnimeList en el APK. Las pruebas de actualización de capítulos y estado utilizan un proveedor local controlado; no alteran una cuenta real.
 
-Validación del 27 de octubre de 2026: 120 pruebas locales aprobadas, análisis estático sin incidencias y prueba voluntaria contra el servidor real aprobada (conexión pendiente, estado y revocación). Se verificó además el formulario de vinculación, CSRF, PKCE y la redirección a la aplicación MAL registrada. El release web activo es `yomashi-manga-20261027-2`; sus 131 archivos se comprobaron antes de la activación. El APK ARM64 2.3.1 usa código de versión 2005 y conserva el certificado de la instalación personal anterior.
+Validación del 27 de octubre de 2026: 120 pruebas locales aprobadas, análisis estático sin incidencias y prueba voluntaria contra el servidor real aprobada (conexión pendiente, estado y revocación). Se verificó además el formulario de vinculación, CSRF, PKCE y la redirección a la aplicación MAL registrada. El release web activo es `yomashi-authorize-20261027-1`; sus 131 archivos se comprobaron antes de la activación. El APK ARM64 2.3.1 usa código de versión 2005 y conserva el certificado de la instalación personal anterior.
+
+La regresión adicional de Chromium reprodujo el bloqueo con la política anterior y aprobó con la corrección, tanto en la prueba local como en el sitio publicado: clic real, POST 303, solicitud al destino MAL y ausencia de errores CSP. Se revocaron las conexiones de prueba y se retiraron los auxiliares temporales del despliegue.
 
 Referencias oficiales: [OAuth de MyAnimeList](https://myanimelist.net/apiconfig/references/authorization), [API v2](https://myanimelist.net/apiconfig/references/api/v2).

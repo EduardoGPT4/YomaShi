@@ -3,6 +3,8 @@
 declare(strict_types=1);
 session_start();$_SESSION['csrf']??=bin2hex(random_bytes(24));
 header('Cache-Control: no-store');
+// Match the production policy so browser tests exercise redirected form submits.
+header("Content-Security-Policy: default-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
 class WebError extends RuntimeException { function __construct(string $m,public int $status=422){parent::__construct($m);} }
 class MalRemoteError extends RuntimeException { function __construct(public int $httpStatus,public string $kind=''){parent::__construct('MAL fixture failed');} }
 function db():PDO { static $db;$db??=new PDO('sqlite:'.getenv('YS_TEST_DB'),null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);return $db; }

@@ -4,6 +4,14 @@ define('SEASON_BOOTSTRAPPED',true);
 require __DIR__.'/private/app.php';
 require __DIR__.'/private/yomashi-mal.php';
 header('Referrer-Policy: no-referrer');
+// Chromium applies form-action to the POST's redirects as well. Replace the
+// inherited policy on this page, preserving every directive except this allowlist.
+foreach(headers_list() as $existingHeader) {
+  if(stripos($existingHeader,'Content-Security-Policy:')!==0) continue;
+  $policy=preg_replace('/\bform-action\s+[^;]+/i',"form-action 'self' https://myanimelist.net",$existingHeader,1,$replaced);
+  if($replaced===1) header($policy,true);
+  break;
+}
 try {
   $id=(string)($_POST['device']??$_GET['device']??'');
   if(!preg_match('/^[a-f0-9]{32}$/D',$id)) throw new WebError('Inicia la conexión desde YomaShi.',400);

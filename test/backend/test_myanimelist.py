@@ -73,6 +73,14 @@ class TestMangaBridge(unittest.TestCase):
         except urllib.error.HTTPError as e:r=e
         raw=r.read()
         return r.status,raw,r.headers
+    @unittest.skipUnless(os.environ.get('YOMASHI_BROWSER_TESTS')=='1','Opt-in Chromium UI regression')
+    def test_browser_authorization_navigation(self):
+        env={**os.environ,'YOMASHI_TEST_BASE':self.base}
+        result=subprocess.run(['node',str(ROOT/'test/backend/test_authorize_browser.cjs')],env=env,capture_output=True,text=True,timeout=90)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        data=json.loads(result.stdout.strip().splitlines()[-1])
+        self.assertTrue(data['destination_requested'])
+        self.assertEqual(data['form_post_status'],303)
     def test_complete_manga_authorization_and_updates(self):
         code,raw,_=self.request(payload={'action':'start'});self.assertEqual(code,200,raw)
         pair=json.loads(raw);token=pair['device_token'];device=pair['device_id']
@@ -81,7 +89,13 @@ class TestMangaBridge(unittest.TestCase):
         self.assertEqual(self.request(payload={'action':'status'},token=token,extra_headers={'X-YomaShi-Token':'b'*64})[0],401)
         self.assertEqual(self.request(payload={'action':'status'})[0],401)
         self.assertEqual(self.request()[0],405)
-        status,raw,_=self.request('yomashi-connect.php?device='+device);self.assertEqual(status,200)
+        status,raw,headers=self.request('yomashi-connect.php?device='+device);self.assertEqual(status,200)
+        policies=headers.get_all('Content-Security-Policy')
+        self.assertEqual(len(policies),1) # A second header would retain the old restriction.
+        self.assertIn("form-action 'self' https://myanimelist.net",policies[0])
+        self.assertIn("frame-ancestors 'none'",policies[0])
+        self.assertIn("script-src 'self'",policies[0])
+        self.assertNotIn('unsafe-inline',policies[0])
         csrf=re.search(rb'name="csrf" value="([a-f0-9]+)"',raw)[1].decode()
         self.assertEqual(self.request('yomashi-connect.php',{'device':device,'csrf':'bad'},form=True)[0],403)
         status,raw,headers=self.request('yomashi-connect.php',{'device':device,'csrf':csrf},form=True);self.assertEqual(status,303,raw)
