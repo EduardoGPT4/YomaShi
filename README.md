@@ -1,5 +1,7 @@
 # YomaShi
 
+[Descargar el último APK](https://github.com/EduardoGPT4/YomaShi/releases/latest)
+
 Aplicación Flutter para explorar, descargar y leer manga desde InManga, MangaDex, zonatmo.org y zonatmo.to, además de una biblioteca local. Se conserva el conector adicional de ManhwaWeb que ya incluía el proyecto.
 
 - Búsqueda con selección de fuentes, resultados y paginación independientes.
@@ -43,6 +45,8 @@ El APK de desarrollo se genera en build/app/outputs/flutter-apk/app-debug.apk. L
 Para uso personal, el APK ARM64 optimizado se compila con `flutter build apk --release --target-platform android-arm64 --split-per-abi --dart-define=YOMASHI_PERSONAL_RELEASE=true`. Este indicador explícito conserva el certificado de depuración existente para permitir actualizar la instalación actual. Conserva ese keystore para futuras actualizaciones. Flutter añade un desplazamiento por ABI al código de versión: el APK ARM64 de 2.3.2+6 utiliza 2006. Las siguientes actualizaciones deben usar el mismo comando y aumentar el número de compilación; evita sustituirlo por un APK universal con un código inferior.
 
 Para otra firma, configura android/key.properties o las variables YOMASHI_KEYSTORE, YOMASHI_STORE_PASSWORD, YOMASHI_KEY_ALIAS y YOMASHI_KEY_PASSWORD. Las credenciales se excluyen del control de versiones. Sin firma ni indicador personal explícito, release falla.
+
+Los APK finales se publican como archivos de GitHub Releases junto con su SHA-256. Después de verificar el APK personal, usa `python tools/publish_apk.py --apk build/app/outputs/flutter-apk/YomaShi-VERSION-arm64.apk --notes-file NOTAS.md --target COMMIT`. El script utiliza la sesión de Git Credential Manager, sube los archivos a una Release en borrador, verifica su contenido y la publica. No reemplaza archivos ya publicados con contenido diferente. Las claves de firma y las credenciales de GitHub no se guardan en el repositorio.
 
 Pruebas físicas: `pwsh -File tools/verify_android.ps1 -Device IDENTIFICADOR -Mode profile`. Se construye una app `app.yomashi.reader.qa`; el script comprueba el identificador del APK antes de instalarlo y usa ese mismo binario en Flutter Drive. No ejecutes `flutter test integration_test` sobre la aplicación personal. No ejecutes compilaciones Flutter simultáneas en este mismo directorio.
 
