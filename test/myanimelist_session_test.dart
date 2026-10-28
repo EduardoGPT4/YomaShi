@@ -1,0 +1,154 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:yomashi/services/myanimelist_client.dart';
+import 'download_engine_regression_test.dart' show RealHttp;
+
+class SessionCredential extends MalCredentialStore {
+  Map<String, dynamic>? value;
+  SessionCredential(this.value);
+  Future<void> Function()? beforeReplace;
+  @override
+  Future<Map<String, dynamic>?> load() async => value;
+  @override
+  Future<void> save(Map<String, dynamic> next) async => value = next;
+  @override
+  Future<void> clear() async => value = null;
+  @override
+  Future<bool> replaceIfToken(
+    String? expectedToken,
+    Map<String, dynamic>? next,
+  ) async {
+    await beforeReplace?.call();
+    if (value?['device_token'] != expectedToken) return false;
+    value = next;
+    return true;
+  }
+}
+
+Map<String, dynamic> session(String token, int owner) => {
+  'device_token': token * 64,
+  'connected': true,
+  'profile': {'id': owner, 'name': 'Owner$owner'},
+};
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  late HttpServer server;
+  late HttpClient raw;
+  late MyAnimeListClient client;
+  late SessionCredential credentials;
+  late Completer<HttpRequest> incoming;
+  late Completer<void> handled;
+  late Future<void> Function(HttpRequest) respond;
+  setUp(() async {
+    server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    raw = HttpOverrides.runWithHttpOverrides(() => HttpClient(), RealHttp());
+    credentials = SessionCredential(session('a', 7));
+    client = MyAnimeListClient(
+      api: Uri.parse('http://127.0.0.1:${server.port}/api'),
+      http: raw,
+      credentials: credentials,
+    );
+    incoming = Completer<HttpRequest>();
+    handled = Completer<void>();
+    respond = (r) async {
+      await r.drain<void>();
+      incoming.complete(r);
+      await handled.future;
+      r.response.headers.contentType = ContentType.json;
+      r.response.write(
+        jsonEncode({
+          'connected': true,
+          'profile': {'id': 7, 'name': 'FirstOwner'},
+        }),
+      );
+      await r.response.close();
+    };
+    server.listen((r) async => respond(r));
+  });
+  tearDown(() async {
+    if (!handled.isCompleted) handled.complete();
+    raw.close(force: true);
+    await server.close(force: true);
+  });
+  test(
+    'late account status cannot overwrite a newly connected credential',
+    () async {
+      final pending = client.account();
+      final request = await incoming.future;
+      expect(request.headers.value('authorization'), 'Bearer ${'a' * 64}');
+      credentials.value = session('b', 8);
+      final assertion = expectLater(
+        pending,
+        throwsA(isA<MalFailure>().having((e) => e.status, 'status', 409)),
+      );
+      handled.complete();
+      await assertion;
+      expect(credentials.value!['device_token'], 'b' * 64);
+      expect((credentials.value!['profile'] as Map)['id'], 8);
+    },
+  );
+  test(
+    '401 from a previous session cannot clear the replacement connection',
+    () async {
+      respond = (r) async {
+        await r.drain<void>();
+        incoming.complete(r);
+        await handled.future;
+        r.response.statusCode = 401;
+        r.response.write('{"error":"Expired old session"}');
+        await r.response.close();
+      };
+      final pending = client.detail(2);
+      await incoming.future;
+      credentials.value = session('b', 8);
+      final assertion = expectLater(pending, throwsA(isA<MalFailure>()));
+      handled.complete();
+      await assertion;
+      expect(credentials.value!['device_token'], 'b' * 64);
+    },
+  );
+  test(
+    'account status compare-and-swap rejects a change immediately before storage',
+    () async {
+      credentials.beforeReplace = () async =>
+          credentials.value = session('b', 8);
+      final pending = client.account();
+      await incoming.future;
+      final assertion = expectLater(
+        pending,
+        throwsA(isA<MalFailure>().having((e) => e.status, 'status', 409)),
+      );
+      handled.complete();
+      await assertion;
+      expect((credentials.value!['profile'] as Map)['id'], 8);
+      expect(credentials.value!['device_token'], 'b' * 64);
+    },
+  );
+  test(
+    'disconnect cannot forget a connection created during remote revocation',
+    () async {
+      final pending = client.disconnect();
+      await incoming.future;
+      credentials.value = session('b', 8);
+      final assertion = expectLater(pending, throwsA(isA<MalFailure>()));
+      handled.complete();
+      await assertion;
+      expect(credentials.value!['device_token'], 'b' * 64);
+    },
+  );
+  test(
+    'unchanged session status is saved with its original device token',
+    () async {
+      final pending = client.account();
+      await incoming.future;
+      handled.complete();
+      final account = await pending;
+      expect(account!['device_token'], 'a' * 64);
+      expect((account['profile'] as Map)['name'], 'FirstOwner');
+      expect(credentials.value, account);
+    },
+  );
+}
