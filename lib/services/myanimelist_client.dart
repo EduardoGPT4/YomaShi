@@ -326,9 +326,21 @@ class MyAnimeListClient {
     final auth = await credentials.load();
     if (auth == null) return null;
     final status = await _requestWithSession({'action': 'status'}, auth);
+    final profile = status['profile'];
+    final previous = auth['profile'];
+    // Older backend versions omit picture. Preserve it only for the same owner;
+    // an explicit empty picture from the current API removes the old photo.
+    final nextProfile =
+        profile is Map &&
+            previous is Map &&
+            profile['id'] == previous['id'] &&
+            !profile.containsKey('picture') &&
+            previous.containsKey('picture')
+        ? {...profile, 'picture': previous['picture']}
+        : profile;
     final next = {
       ...auth,
-      'profile': status['profile'],
+      'profile': nextProfile,
       'connected': status['connected'] == true,
     };
     if (!await credentials.replaceIfToken(

@@ -25,10 +25,12 @@ class ProfileProvider extends ChangeNotifier {
   int _identityGeneration = 0;
   int? _malUserId;
   String? _malUsername;
+  String? _malAvatarUrl;
   Future<void>? _refreshingAccount;
 
   String get displayName => _malUsername ?? _displayName;
   String? get myAnimeListUsername => _malUsername;
+  String? get myAnimeListAvatarUrl => _malAvatarUrl;
   bool get usesMyAnimeListIdentity => _malUsername != null;
   String? get avatarPath => _avatarPath;
   bool get isLoaded => _loaded;
@@ -57,10 +59,35 @@ class ProfileProvider extends ChangeNotifier {
         name.trim().isNotEmpty;
     final nextName = connected ? name.trim() : null;
     final nextId = connected ? id : null;
-    if (_malUsername == nextName && _malUserId == nextId) return;
+    final picture = profile is Map ? profile['picture'] : null;
+    final nextAvatar = connected ? _validatedAvatar(picture) : null;
+    if (_malUsername == nextName &&
+        _malUserId == nextId &&
+        _malAvatarUrl == nextAvatar) {
+      return;
+    }
     _malUsername = nextName;
     _malUserId = nextId;
+    _malAvatarUrl = nextAvatar;
     notifyListeners();
+  }
+
+  static String? _validatedAvatar(Object? value) {
+    if (value is! String ||
+        value.length > 2048 ||
+        RegExp(r'[\x00-\x20\\]').hasMatch(value)) {
+      return null;
+    }
+    final uri = Uri.tryParse(value);
+    if (uri == null ||
+        uri.scheme != 'https' ||
+        uri.host != 'cdn.myanimelist.net' ||
+        uri.port != 443 ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasFragment) {
+      return null;
+    }
+    return value;
   }
 
   /// Refreshes session status without hiding the cached identity while offline.

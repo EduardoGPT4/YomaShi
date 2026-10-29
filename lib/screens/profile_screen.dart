@@ -25,6 +25,7 @@ import '../widgets/download_settings_panel.dart';
 import '../widgets/home_content_layout.dart';
 import '../widgets/reader_settings_panel.dart';
 import '../widgets/section_header.dart';
+import '../widgets/profile_avatar.dart';
 import 'history_screen.dart';
 import 'stats_screen.dart';
 import 'storage_screen.dart';
@@ -431,13 +432,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'Novedades 2.4.0',
+                  'Novedades 2.4.1',
                   style: theme.textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
+                  '• Foto del perfil sincronizada con MyAnimeList.\n'
                   '• Descargas resumidas, progreso claro y detalles desplegables.\n'
                   '• Perfil organizado y conexión de MyAnimeList más sencilla.\n'
                   '• Ajustes desde el lector y búsqueda de capítulos.\n'
@@ -495,49 +497,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Row(
               children: [
                 GestureDetector(
-                  onTap: () => unawaited(_pickAvatar()),
-                  onLongPress: profile.hasAvatar
+                  onTap: profile.myAnimeListAvatarUrl != null
+                      ? null
+                      : () => unawaited(_pickAvatar()),
+                  onLongPress:
+                      profile.myAnimeListAvatarUrl == null && profile.hasAvatar
                       ? () => unawaited(profile.clearAvatar())
                       : null,
                   child: Stack(
                     children: [
-                      CircleAvatar(
-                        radius: 36,
-                        backgroundColor: theme.colorScheme.primary.withAlpha(
-                          36,
-                        ),
-                        backgroundImage: profile.hasAvatar
-                            ? FileImage(File(profile.avatarPath!))
-                            : null,
-                        child: profile.hasAvatar
-                            ? null
-                            : Icon(
-                                Icons.person_rounded,
-                                size: 36,
-                                color: theme.colorScheme.primary,
-                              ),
+                      Tooltip(
+                        message: profile.myAnimeListAvatarUrl == null
+                            ? 'Editar foto local'
+                            : 'Foto sincronizada con MyAnimeList',
+                        child: ProfileAvatar(profile: profile),
                       ),
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primary,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: theme.colorScheme.surface,
-                              width: 2,
+                      if (profile.myAnimeListAvatarUrl == null)
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: theme.colorScheme.surface,
+                                width: 2,
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.camera_alt_rounded,
+                              size: 12,
+                              color: theme.colorScheme.onPrimary,
                             ),
                           ),
-                          child: Icon(
-                            Icons.camera_alt_rounded,
-                            size: 12,
-                            color: theme.colorScheme.onPrimary,
-                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),

@@ -25,6 +25,6 @@ function mal_http(string $endpoint,array $params=[],?string $token=null,string $
   $curl=curl_init($url);curl_setopt_array($curl,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_CUSTOMREQUEST=>$method,CURLOPT_HTTPHEADER=>$headers,CURLOPT_TIMEOUT=>5]);
   if($method!=='GET')curl_setopt($curl,CURLOPT_POSTFIELDS,$query);
   $raw=curl_exec($curl);$status=(int)curl_getinfo($curl,CURLINFO_HTTP_CODE);unset($curl);
-  if($status<200||$status>=300)throw new MalRemoteError($status);
+  if($status<200||$status>=300)throw new MalRemoteError($status,(json_decode($raw,true)['error']??'')==='invalid_grant'?'invalid_grant':'');
   return json_decode($raw,true,32,JSON_THROW_ON_ERROR);
 }

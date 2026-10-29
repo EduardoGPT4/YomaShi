@@ -12,6 +12,17 @@ function ys_id(mixed $input): int {
   if (!is_int($input) || $input<1 || $input>999999999) throw new WebError('ID de manga inválido.');
   return $input;
 }
+function ys_profile_picture(mixed $value): string {
+  if(!is_string($value) || strlen($value)>2048 || preg_match('/[\x00-\x20\\\\]/',$value)) return '';
+  $url=parse_url($value);
+  return is_array($url) && ($url['scheme']??'')==='https' && ($url['host']??'')==='cdn.myanimelist.net'
+    && !isset($url['user']) && !isset($url['pass']) && !isset($url['fragment'])
+    && ($url['port']??443)===443 ? $value : '';
+}
+function ys_profile(array $response): array {
+  $identity=mal_profile_data($response);
+  return ['id'=>$identity['id'],'name'=>$identity['name'],'picture'=>ys_profile_picture($response['picture']??'')];
+}
 function ys_crypt(string $input, string $device, bool $decrypt=false): string {
   $key=base64_decode(mal_require_config()['encryption_key'],true);
   if($decrypt) {
@@ -51,7 +62,8 @@ function ys_complete(PDO $db,array $query): array {
   if(!is_string($code) || strlen($code)<1 || strlen($code)>4096) throw new WebError('Código de autorización inválido.',400);
   $config=mal_require_config();
   $tokens=mal_tokens(mal_http('token',['grant_type'=>'authorization_code','client_id'=>$config['client_id'],'client_secret'=>$config['client_secret'],'redirect_uri'=>$config['redirect_uri'],'code'=>$code,'code_verifier'=>$flow['verifier']]));
-  $profile=mal_profile_data(mal_http('profile',[],$tokens['access_token']));
+  $profile=ys_profile(mal_http('profile',[],$tokens['access_token']));
+  $tokens['profile']=$profile;$tokens['profile_next_refresh']=time()+86400;
   $cipher=ys_crypt(json_encode($tokens,JSON_THROW_ON_ERROR),$flow['device']);
   $changed=sql($db,'UPDATE sa1_yomashi_devices SET tokens=?,mal_user_id=?,mal_name=?,expires_at=? WHERE id=? AND tokens IS NULL AND expires_at>?',[$cipher,$profile['id'],$profile['name'],time()+90*86400,$flow['device'],time()])->rowCount();
   if($changed!==1) throw new WebError('La conexión caducó. Vuelve a iniciarla en YomaShi.',410);
@@ -75,6 +87,43 @@ function ys_normalize(array $m): array {
 function ys_manga(string $token,int $id): array {
   return ys_normalize(mal_http('manga:'.$id,['fields'=>'id,title,main_picture,num_chapters,status,my_list_status{status,num_chapters_read}'],$token));
 }
+function ys_access_tokens(PDO $db,array $row,array $tokens,bool &$refreshed): array {
+  if(($tokens['expires_at']??0)<time()+60) {
+    $config=mal_require_config();
+    $next=mal_tokens(mal_http('token',['grant_type'=>'refresh_token','client_id'=>$config['client_id'],'client_secret'=>$config['client_secret'],'refresh_token'=>$tokens['refresh_token']]),$tokens['refresh_token']);
+    // Preserve the encrypted profile cache when MAL rotates its tokens.
+    $tokens=array_replace($tokens,$next);
+    sql($db,'UPDATE sa1_yomashi_devices SET tokens=? WHERE id=?',[ys_crypt(json_encode($tokens,JSON_THROW_ON_ERROR),$row['id']),$row['id']]);
+    $refreshed=true;
+  }
+  return $tokens;
+}
+function ys_status(PDO $db,array $row,bool &$refreshed): array {
+  if($row['tokens']===null) return ['connected'=>false,'profile'=>null];
+  $tokens=json_decode(ys_crypt($row['tokens'],$row['id'],true),true,16,JSON_THROW_ON_ERROR);
+  $cached=$tokens['profile']??null;
+  $profile=['id'=>(int)$row['mal_user_id'],'name'=>$row['mal_name'],'picture'=>''];
+  if(is_array($cached) && ($cached['id']??null)===$profile['id']) {
+    $profile['picture']=ys_profile_picture($cached['picture']??'');
+  }
+  if(($tokens['profile_next_refresh']??0)>time()) return ['connected'=>true,'profile'=>$profile];
+  // Legacy sessions have no profile cache and are upgraded on their next status
+  // request. Provider outages retain the last image and back off for ten minutes.
+  $tokens['profile_next_refresh']=time()+600;
+  try {
+    $tokens=ys_access_tokens($db,$row,$tokens,$refreshed);
+    $next=ys_profile(mal_http('profile',[],$tokens['access_token']));
+    // Never keep an apparently connected device whose token now represents a
+    // different account: the common 401 path revokes it before any later writes.
+    if($next['id']!==$profile['id']) throw new MalRemoteError(401,'identity_changed');
+    $profile=$next;$tokens['profile']=$profile;$tokens['profile_next_refresh']=time()+86400;
+    sql($db,'UPDATE sa1_yomashi_devices SET mal_name=? WHERE id=? AND mal_user_id=?',[$profile['name'],$row['id'],$profile['id']]);
+  } catch(MalRemoteError|WebError $error) {
+    if($error instanceof MalRemoteError && ($error->httpStatus===401 || $error->kind==='invalid_grant')) throw $error;
+  }
+  sql($db,'UPDATE sa1_yomashi_devices SET tokens=? WHERE id=?',[ys_crypt(json_encode($tokens,JSON_THROW_ON_ERROR),$row['id']),$row['id']]);
+  return ['connected'=>true,'profile'=>$profile];
+}
 function ys_dispatch(PDO $db,array $input,string $bearer): array {
   ys_schema($db);$action=$input['action']??'';
   if($action==='start') return ys_start($db);
@@ -91,16 +140,11 @@ function ys_dispatch(PDO $db,array $input,string $bearer): array {
     $row=sql($db,'SELECT * FROM sa1_yomashi_devices WHERE token_hash=? AND expires_at>?'.($db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql'?' FOR UPDATE':''),[hash('sha256',$bearer),time()])->fetch();
     if(!$row) throw new WebError('La conexión caducó. Vuelve a conectar MyAnimeList.',401);
     if($action==='disconnect') { sql($db,'DELETE FROM sa1_yomashi_devices WHERE id=?',[$row['id']]);$db->commit();return ['connected'=>false]; }
-    if($action==='status') { $db->commit();return ['connected'=>$row['tokens']!==null,'profile'=>$row['tokens']!==null?['id'=>(int)$row['mal_user_id'],'name'=>$row['mal_name']]:null]; }
+    if($action==='status') { $result=ys_status($db,$row,$refreshed);$db->commit();return $result; }
     if($row['tokens']===null) throw new WebError('Termina la autorización en el navegador.',409);
     if(isset($input['owner_id']) && $input['owner_id']!==(int)$row['mal_user_id']) throw new WebError('La cuenta cambió. Vuelve a seleccionar el manga.',409);
     $tokens=json_decode(ys_crypt($row['tokens'],$row['id'],true),true,16,JSON_THROW_ON_ERROR);
-    if($tokens['expires_at']<time()+60) {
-      $config=mal_require_config();
-      $tokens=mal_tokens(mal_http('token',['grant_type'=>'refresh_token','client_id'=>$config['client_id'],'client_secret'=>$config['client_secret'],'refresh_token'=>$tokens['refresh_token']]),$tokens['refresh_token']);
-      sql($db,'UPDATE sa1_yomashi_devices SET tokens=? WHERE id=?',[ys_crypt(json_encode($tokens,JSON_THROW_ON_ERROR),$row['id']),$row['id']]);
-      $refreshed=true;
-    }
+    $tokens=ys_access_tokens($db,$row,$tokens,$refreshed);
     $token=$tokens['access_token'];
     if($action==='search') {
       $q=trim((string)($input['query']??''));

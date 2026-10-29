@@ -1,5 +1,15 @@
 # Interfaz 2.4.0
 
+## Corrección 2.4.1: foto de MyAnimeList
+
+El perfil usa también la foto devuelta por la API de MAL. El servidor conserva la URL junto a la credencial cifrada y actualiza las sesiones existentes sin nueva autorización. La caché de metadatos se renueva cada 24 horas; un fallo temporal conserva la imagen conocida y espera diez minutos antes de reintentar. Las imágenes descargadas se reutilizan desde la caché habitual de la aplicación.
+
+La foto local se conserva como alternativa y vuelve a aparecer al desconectar. La app valida la URL, actualiza la imagen cuando cambia y descarta respuestas antiguas al cambiar de cuenta. Si no hay foto o no se puede cargar, muestra la foto local o el icono.
+
+Pruebas adicionales comprueban propagación de `profile.picture`, caché, retirada de foto, cambios de cuenta, desconexión, URL inválida y errores del proveedor, además de la selección de imagen en la interfaz.
+
+Validación de 2.4.1: 157 pruebas Flutter correctas, 4 pruebas funcionales PHP correctas y análisis estático limpio. La extensión publicada corresponde a `yomashi-avatar-20261029-1`, con sus 131 archivos verificados y copia cifrada previa comprobada.
+
 Cambios derivados de las 17 capturas revisadas el 28 de octubre de 2026.
 
 ## Cambios
@@ -27,4 +37,4 @@ Cambios derivados de las 17 capturas revisadas el 28 de octubre de 2026.
 
   Se guardan en `build/verification/ui-2.4.0/`, excluido de Git. Usan el tema real y fuentes del SDK.
 
-El backend de MyAnimeList conserva su protocolo y despliegue; esta actualización no requiere cambios en el servidor.
+La interfaz 2.4.0 conservaba el backend existente. La foto de perfil de 2.4.1 requiere publicar también la extensión de `server/`; no añade tablas ni cambia la configuración privada.

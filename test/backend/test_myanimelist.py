@@ -12,12 +12,13 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 class Fixture(BaseHTTPRequestHandler):
     records=[];patches=[];chapters=0;status='plan_to_read';token_calls=0
+    profile={'id':7,'name':'MangaTester','picture':'https://cdn.myanimelist.net/images/userimages/7.jpg'};profile_status=200;token_status=200;token_error='server_error'
     def log_message(self,*args):pass
     def respond(self,data,status=200):
         raw=json.dumps(data).encode();self.send_response(status);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
     def do_GET(self):
         type(self).records.append(('GET',self.path))
-        if self.path=='/profile':return self.respond({'id':7,'name':'MangaTester'})
+        if self.path=='/profile':return self.respond(self.profile,self.profile_status)
         node={'id':2,'title':'Berserk fixture','num_chapters':100,'status':'finished','main_picture':{},'my_list_status':{'status':self.status,'num_chapters_read':self.chapters}}
         if self.path.startswith('/manga-search?'):return self.respond({'data':[{'node':node}]})
         if self.path.startswith('/manga:2?'):return self.respond(node)
@@ -25,6 +26,7 @@ class Fixture(BaseHTTPRequestHandler):
     def do_POST(self):
         values=urllib.parse.parse_qs(self.rfile.read(int(self.headers.get('Content-Length',0))).decode());type(self).records.append(('POST',self.path))
         if self.path=='/token':
+            if self.token_status!=200:return self.respond({'error':self.token_error},self.token_status)
             if values.get('grant_type')==['refresh_token'] and values.get('refresh_token')!=['fixture-refresh-token-'+str(self.token_calls)]:
                 return self.respond({'error':'invalid_grant'},400)
             type(self).token_calls+=1
@@ -39,6 +41,10 @@ class Fixture(BaseHTTPRequestHandler):
         return self.respond({'num_chapters_read':self.chapters,'status':self.status,'score':8,'num_volumes_read':3})
 
 class TestMangaBridge(unittest.TestCase):
+    def setUp(self):
+        Fixture.profile={'id':7,'name':'MangaTester','picture':'https://cdn.myanimelist.net/images/userimages/7.jpg'}
+        Fixture.profile_status=200
+        Fixture.token_status=200;Fixture.token_error='server_error'
     @classmethod
     def setUpClass(cls):
         cls.temp=tempfile.TemporaryDirectory(prefix='yomashi-mal-');cls.folder=Path(cls.temp.name)
@@ -73,6 +79,93 @@ class TestMangaBridge(unittest.TestCase):
         except urllib.error.HTTPError as e:r=e
         raw=r.read()
         return r.status,raw,r.headers
+    def connect_fixture(self):
+        status,raw,_=self.request(payload={'action':'start'});self.assertEqual(status,200,raw)
+        pair=json.loads(raw)
+        status,raw,_=self.request('yomashi-connect.php?device='+pair['device_id']);self.assertEqual(status,200,raw)
+        csrf=re.search(rb'name="csrf" value="([a-f0-9]+)"',raw)[1].decode()
+        status,raw,headers=self.request('yomashi-connect.php',{'device':pair['device_id'],'csrf':csrf},form=True);self.assertEqual(status,303,raw)
+        state=urllib.parse.parse_qs(urllib.parse.urlparse(headers['Location']).query)['state'][0]
+        status,raw,_=self.request('mal-callback.php?'+urllib.parse.urlencode({'state':state,'code':'fixture'}));self.assertEqual(status,200,raw)
+        return pair
+    def age_profile_cache(self,device,legacy=False):
+        # Only the encrypted localhost fixture is touched, never production data.
+        program=r'''define('SEASON_BOOTSTRAPPED',true);require $argv[1].'/private/app.php';require $argv[1].'/private/yomashi-mal.php';$db=db();$row=sql($db,'SELECT * FROM sa1_yomashi_devices WHERE id=?',[$argv[2]])->fetch();$tokens=json_decode(ys_crypt($row['tokens'],$row['id'],true),true);$tokens['profile_next_refresh']=0;if($argv[3]==='legacy')unset($tokens['profile']);sql($db,'UPDATE sa1_yomashi_devices SET tokens=? WHERE id=?',[ys_crypt(json_encode($tokens,JSON_THROW_ON_ERROR),$row['id']),$row['id']]);'''
+        env={**os.environ,'YS_TEST_DB':str(self.folder/'fixture.sqlite')}
+        result=subprocess.run(['php','-r',program,str(self.folder),device,'legacy' if legacy else 'age'],env=env,capture_output=True,text=True,timeout=10)
+        self.assertEqual(result.returncode,0,result.stderr)
+    def encrypted_profile_cache(self,device):
+        program=r'''define('SEASON_BOOTSTRAPPED',true);require $argv[1].'/private/app.php';require $argv[1].'/private/yomashi-mal.php';$row=sql(db(),'SELECT * FROM sa1_yomashi_devices WHERE id=?',[$argv[2]])->fetch();$tokens=json_decode(ys_crypt($row['tokens'],$row['id'],true),true);echo json_encode(['profile'=>$tokens['profile']??null,'profile_next_refresh'=>$tokens['profile_next_refresh']??0,'expires_at'=>$tokens['expires_at']??0]);'''
+        result=subprocess.run(['php','-r',program,str(self.folder),device],env={**os.environ,'YS_TEST_DB':str(self.folder/'fixture.sqlite')},capture_output=True,text=True,timeout=10)
+        self.assertEqual(result.returncode,0,result.stderr);return json.loads(result.stdout)
+    def profile_status(self,token):
+        status,raw,_=self.request(payload={'action':'status'},token=token)
+        self.assertEqual(status,200,raw)
+        self.assertNotIn(b'fixture-access-token',raw);self.assertNotIn(b'fixture-refresh-token',raw)
+        result=json.loads(raw);self.assertTrue(result['connected']);return result['profile']
+    def test_avatar_status_upgrades_legacy_sessions_and_caches_refreshes(self):
+        pair=self.connect_fixture();token=pair['device_token'];device=pair['device_id']
+        def requests():return len([path for method,path in Fixture.records if path=='/profile'])
+        before=requests()
+        self.assertEqual(self.profile_status(token)['picture'],Fixture.profile['picture'])
+        self.assertEqual(requests(),before) # Initial authorization cached the image.
+        self.age_profile_cache(device,legacy=True)
+        self.assertEqual(self.profile_status(token)['picture'],Fixture.profile['picture'])
+        self.assertEqual(requests(),before+1) # No reconnect needed for existing sessions.
+        old=Fixture.profile['picture'];Fixture.profile['picture']='https://cdn.myanimelist.net/s/common/userimages/7-new.jpg'
+        self.assertEqual(self.profile_status(token)['picture'],old)
+        self.assertEqual(requests(),before+1)
+        self.age_profile_cache(device)
+        self.assertEqual(self.profile_status(token)['picture'],Fixture.profile['picture'])
+        self.assertEqual(requests(),before+2)
+        Fixture.profile_status=503;self.age_profile_cache(device)
+        refreshes=Fixture.token_calls
+        self.assertEqual(self.profile_status(token)['picture'],Fixture.profile['picture'])
+        self.assertGreater(Fixture.token_calls,refreshes) # Expired access token rotated before the profile failure.
+        cached=self.encrypted_profile_cache(device)
+        self.assertEqual(cached['profile']['picture'],Fixture.profile['picture'])
+        self.assertGreater(cached['profile_next_refresh'],int(time.time()))
+        self.assertLess(cached['profile_next_refresh'],int(time.time())+620)
+        after_failure=requests()
+        self.assertEqual(self.profile_status(token)['picture'],Fixture.profile['picture'])
+        self.assertEqual(requests(),after_failure) # Provider errors back off, retaining image.
+        Fixture.profile_status=200
+        for unsafe in ['https://untrusted.example/avatar.jpg','http://cdn.myanimelist.net/avatar.jpg',
+                       'https://cdn.myanimelist.net.evil.example/avatar.jpg','https://name:pass@cdn.myanimelist.net/avatar.jpg',
+                       'https://cdn.myanimelist.net:444/avatar.jpg','https://cdn.myanimelist.net/avatar.jpg#fragment',
+                       'https://cdn.myanimelist.net/avatar.jpg\r\n']:
+            Fixture.profile['picture']=unsafe;self.age_profile_cache(device)
+            self.assertEqual(self.profile_status(token)['picture'],'',unsafe)
+        Fixture.profile['picture']='';self.age_profile_cache(device)
+        self.assertEqual(self.profile_status(token)['picture'],'') # Accounts may have no avatar.
+        Fixture.profile_status=401;self.age_profile_cache(device)
+        self.assertEqual(self.request(payload={'action':'status'},token=token)[0],401)
+        self.assertEqual(self.request(payload={'action':'status'},token=token)[0],401)
+    def test_avatar_account_mismatch_revokes_device_before_future_writes(self):
+        pair=self.connect_fixture();token=pair['device_token'];device=pair['device_id']
+        Fixture.profile={'id':8,'name':'OtherOwner','picture':'https://cdn.myanimelist.net/images/userimages/8.jpg'}
+        self.age_profile_cache(device)
+        status,raw,_=self.request(payload={'action':'status'},token=token)
+        self.assertEqual(status,401,raw);self.assertNotIn(b'OtherOwner',raw)
+        conn=sqlite3.connect(self.folder/'fixture.sqlite')
+        self.assertEqual(conn.execute('SELECT COUNT(*) FROM sa1_yomashi_devices WHERE id=?',(device,)).fetchone()[0],0);conn.close()
+        before=len(Fixture.patches)
+        self.assertEqual(self.request(payload={'action':'update','id':2,'chapters_read':1,'status':'reading'},token=token)[0],401)
+        self.assertEqual(len(Fixture.patches),before)
+    def test_avatar_refresh_outage_keeps_cache_and_invalid_grant_revokes(self):
+        pair=self.connect_fixture();token=pair['device_token'];device=pair['device_id']
+        self.age_profile_cache(device);before=Fixture.token_calls
+        Fixture.token_status=503
+        self.assertEqual(self.profile_status(token)['picture'],Fixture.profile['picture'])
+        self.assertEqual(Fixture.token_calls,before)
+        self.assertEqual(self.encrypted_profile_cache(device)['profile']['picture'],Fixture.profile['picture'])
+        # Repeated app resumes cannot hammer the unavailable token endpoint.
+        before=len(Fixture.records);self.profile_status(token);self.assertEqual(len(Fixture.records),before)
+        Fixture.token_status=200;self.age_profile_cache(device)
+        self.assertEqual(self.profile_status(token)['picture'],Fixture.profile['picture'])
+        self.assertGreater(Fixture.token_calls,0)
+        Fixture.token_status=400;Fixture.token_error='invalid_grant';self.age_profile_cache(device)
+        self.assertEqual(self.request(payload={'action':'status'},token=token)[0],401)
     @unittest.skipUnless(os.environ.get('YOMASHI_BROWSER_TESTS')=='1','Opt-in Chromium UI regression')
     def test_browser_authorization_navigation(self):
         env={**os.environ,'YOMASHI_TEST_BASE':self.base}

@@ -28,10 +28,10 @@ class SessionCredential extends MalCredentialStore {
   }
 }
 
-Map<String, dynamic> session(String token, int owner) => {
+Map<String, dynamic> session(String token, int owner, {String? picture}) => {
   'device_token': token * 64,
   'connected': true,
-  'profile': {'id': owner, 'name': 'Owner$owner'},
+  'profile': {'id': owner, 'name': 'Owner$owner', 'picture': ?picture},
 };
 
 void main() {
@@ -83,7 +83,9 @@ void main() {
       final pending = client.account();
       final request = await incoming.future;
       expect(request.headers.value('authorization'), 'Bearer ${'a' * 64}');
-      credentials.value = session('b', 8);
+      const replacementPicture =
+          'https://cdn.myanimelist.net/images/userimages/8.jpg';
+      credentials.value = session('b', 8, picture: replacementPicture);
       final assertion = expectLater(
         pending,
         throwsA(isA<MalFailure>().having((e) => e.status, 'status', 409)),
@@ -92,6 +94,10 @@ void main() {
       await assertion;
       expect(credentials.value!['device_token'], 'b' * 64);
       expect((credentials.value!['profile'] as Map)['id'], 8);
+      expect(
+        (credentials.value!['profile'] as Map)['picture'],
+        replacementPicture,
+      );
       expect(sessionEvents, 0);
     },
   );
@@ -170,6 +176,41 @@ void main() {
       handled.complete();
       await Future.wait([first, second]);
       expect(sessionEvents, 1);
+    },
+  );
+  test(
+    'status commits the MAL picture and updates the visible profile automatically',
+    () async {
+      const picture = 'https://cdn.myanimelist.net/images/userimages/7.jpg?t=2';
+      final profile = ProfileProvider(malClient: client);
+      addTearDown(profile.dispose);
+      await profile.reloadMyAnimeListIdentity();
+      expect(profile.myAnimeListAvatarUrl, isNull);
+      respond = (request) async {
+        await request.drain<void>();
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'connected': true,
+            'profile': {'id': 7, 'name': 'Owner7', 'picture': picture},
+          }),
+        );
+        await request.response.close();
+      };
+      await client.account();
+      await Future<void>.delayed(Duration.zero);
+      expect((credentials.value!['profile'] as Map)['picture'], picture);
+      expect(profile.myAnimeListAvatarUrl, picture);
+      expect(sessionEvents, 1);
+
+      respond = (request) async {
+        await request.drain<void>();
+        request.response.write('{"connected":false}');
+        await request.response.close();
+      };
+      await client.disconnect();
+      await Future<void>.delayed(Duration.zero);
+      expect(profile.myAnimeListAvatarUrl, isNull);
     },
   );
   test('profile follows committed login and logout automatically', () async {
