@@ -46,9 +46,9 @@ class _OnboardingDialogState extends State<_OnboardingDialog> {
     ),
     _OnboardingPageData(
       icon: Icons.favorite_rounded,
-      title: 'Favoritos y categorias',
+      title: 'Favoritos y categorías',
       body:
-          'Marca mangas con el corazon. Mantén presionado para asignar categorias personalizadas.',
+          'Marca mangas con el corazón. Mantén presionado para asignar categorías personalizadas.',
     ),
     _OnboardingPageData(
       icon: Icons.download_rounded,

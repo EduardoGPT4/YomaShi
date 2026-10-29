@@ -46,13 +46,16 @@ class SliverMangaGrid extends StatelessWidget {
     final metrics = AppMetrics.of(context);
     return SliverLayoutBuilder(
       builder: (context, constraints) {
+        final columns = constraints.crossAxisExtent < 330
+            ? 2
+            : metrics.gridColumns;
         final width =
             (constraints.crossAxisExtent -
-                metrics.gridSpacing * (metrics.gridColumns - 1)) /
-            metrics.gridColumns;
+                metrics.gridSpacing * (columns - 1)) /
+            columns;
         return SliverGrid(
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: metrics.gridColumns,
+            crossAxisCount: columns,
             mainAxisSpacing: metrics.gridSpacing,
             crossAxisSpacing: metrics.gridSpacing,
             mainAxisExtent: MangaCardLayout.heightForWidth(context, width),
@@ -186,21 +189,30 @@ class _MangaCardState extends State<MangaCard> {
                           ),
                         if (widget.onFavoriteToggle != null)
                           Positioned(
-                            top: 4,
-                            left: 4,
-                            child: Material(
-                              color: Colors.black.withAlpha(140),
-                              shape: const CircleBorder(),
-                              clipBehavior: Clip.antiAlias,
-                              child: InkWell(
-                                onTap: widget.onFavoriteToggle,
+                            top: 0,
+                            left: 0,
+                            child: IconButton(
+                              tooltip: widget.isFavorite
+                                  ? 'Quitar de favoritos'
+                                  : 'Añadir a favoritos',
+                              onPressed: widget.onFavoriteToggle,
+                              constraints: const BoxConstraints(
+                                minWidth: 48,
+                                minHeight: 48,
+                              ),
+                              visualDensity: VisualDensity.standard,
+                              icon: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withAlpha(160),
+                                  shape: BoxShape.circle,
+                                ),
                                 child: Padding(
-                                  padding: const EdgeInsets.all(3),
+                                  padding: const EdgeInsets.all(5),
                                   child: Icon(
                                     widget.isFavorite
                                         ? Icons.favorite_rounded
                                         : Icons.favorite_border_rounded,
-                                    size: 14,
+                                    size: 18,
                                     color: widget.isFavorite
                                         ? const Color(0xFFFF6B8A)
                                         : Colors.white,
@@ -209,9 +221,42 @@ class _MangaCardState extends State<MangaCard> {
                               ),
                             ),
                           ),
+                        if (widget.onLongPress != null)
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: PopupMenuButton<String>(
+                              tooltip: 'Opciones de $_displayTitle',
+                              icon: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withAlpha(160),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Padding(
+                                  padding: EdgeInsets.all(4),
+                                  child: Icon(
+                                    Icons.more_horiz,
+                                    size: 20,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              onSelected: (_) => widget.onLongPress?.call(),
+                              itemBuilder: (_) => const [
+                                PopupMenuItem(
+                                  value: 'categories',
+                                  child: ListTile(
+                                    leading: Icon(Icons.label_outline),
+                                    title: Text('Categorías'),
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         if (widget.badge != null && widget.badge!.isNotEmpty)
                           Positioned(
-                            top: 4,
+                            bottom: 6,
                             right: 4,
                             child: Container(
                               padding: const EdgeInsets.symmetric(

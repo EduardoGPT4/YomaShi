@@ -74,7 +74,8 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
     unawaited(
       SharedPreferences.getInstance().then((prefs) {
         if (!mounted) return;
-        _searchSources = prefs.getStringList('search_sources_v1')?.toSet();
+        final saved = prefs.getStringList('search_sources_v1')?.toSet();
+        setState(() => _searchSources = saved);
       }),
     );
   }
@@ -404,14 +405,25 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
     });
   }
 
-  List<String> get _enabledSearchSources => OnlineCatalogService
-      .searchableSourceIds
-      .where((id) => _searchSources == null || _searchSources!.contains(id))
-      .toList();
+  List<String> get _enabledSearchSources {
+    final known = OnlineCatalogService.searchableSourceIds;
+    final selected = known
+        .where((id) => _searchSources == null || _searchSources!.contains(id))
+        .toList();
+    return selected.isEmpty ? known : selected;
+  }
+
+  String get _searchScopeLabel {
+    final sources = _enabledSearchSources;
+    if (sources.length == OnlineCatalogService.searchableSourceIds.length) {
+      return 'Todas las fuentes';
+    }
+    if (sources.length == 1) return MangaSources.shortLabel(sources.single);
+    return '${sources.length} fuentes seleccionadas';
+  }
+
   Future<void> _chooseSearchSources() async {
-    final enabled = {
-      ...(_searchSources ?? OnlineCatalogService.searchableSourceIds.toSet()),
-    };
+    final enabled = {..._enabledSearchSources};
     final selected = await showDialog<Set<String>>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -606,6 +618,7 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
   Widget _buildOnlineMangaCard(
     OnlineMangaSummary item, {
     String? badge,
+    bool showSource = true,
     required FavoritesProvider favorites,
   }) {
     return MangaCard(
@@ -613,7 +626,7 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
       coverPath: item.coverUrl,
       badge:
           badge ??
-          (item.sourceId == null || item.sourceId!.isEmpty
+          (!showSource || item.sourceId == null || item.sourceId!.isEmpty
               ? null
               : MangaSources.shortLabel(item.sourceId!)),
       isFavorite: favorites.isFavorite(item.url),
@@ -805,28 +818,48 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   sliver: SliverToBoxAdapter(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                          child: SearchBarField(
-                            controller: _searchController,
-                            hintText: 'Buscar en todas las fuentes',
-                            onChanged: _onSearchChanged,
-                            onClear: () {
-                              _searchController.clear();
-                              _onSearchChanged('');
-                              setState(() {});
-                            },
+                        SearchBarField(
+                          controller: _searchController,
+                          hintText: _searchScopeLabel == 'Todas las fuentes'
+                              ? 'Buscar en todas las fuentes'
+                              : 'Buscar en $_searchScopeLabel',
+                          onChanged: _onSearchChanged,
+                          onClear: () {
+                            _searchController.clear();
+                            _onSearchChanged('');
+                            setState(() {});
+                          },
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          alignment: WrapAlignment.spaceBetween,
+                          children: [
+                            TextButton.icon(
+                              onPressed: () =>
+                                  unawaited(_chooseSearchSources()),
+                              icon: const Icon(Icons.travel_explore, size: 18),
+                              label: Text(
+                                _query.isEmpty
+                                    ? 'Buscar: $_searchScopeLabel'
+                                    : 'Búsqueda: $_searchScopeLabel',
+                              ),
+                            ),
+                            _buildFilterButton(),
+                          ],
+                        ),
+                        if (_query.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              'Catálogo de ${MangaSources.byId(sourceId).name}',
+                              style: theme.textTheme.labelMedium,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          tooltip: 'Fuentes de búsqueda',
-                          onPressed: () => unawaited(_chooseSearchSources()),
-                          icon: const Icon(Icons.manage_search),
-                        ),
-                        _buildFilterButton(),
                       ],
                     ),
                   ),
@@ -943,7 +976,7 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
 
   List<Widget> _sliverGlobalSearch(FavoritesProvider favorites) {
     final slivers = <Widget>[];
-    final unreachable = <({String name, String message})>[];
+    final unavailable = <({String name, VoidCallback retry})>[];
     var anyItems = false;
     var anyError = false;
     var catalogResponded = false;
@@ -970,51 +1003,19 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
         continue;
       }
       if (bucketError != null && filtered.isEmpty) {
-        slivers.add(
-          SliverToBoxAdapter(
-            child: TextButton.icon(
-              onPressed: () => unawaited(
-                _searchPage(
-                  bucket.sourceId,
-                  _query,
-                  _searchGen,
-                  bucket.currentPage,
-                ),
-              ),
-              icon: const Icon(Icons.refresh),
-              label: Text('Reintentar ${source.name}'),
-            ),
-          ),
-        );
-        if (NetworkErrors.isServerUnreachable(bucketError)) {
-          unreachable.add((
-            name: MangaSources.shortLabel(source.id),
-            message: NetworkErrors.friendly(bucketError),
-          ));
-          continue;
-        }
         anyError = true;
         catalogResponded = true;
-        slivers.add(
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
-              12,
-              HomeContentLayout.sectionSpacing,
-              12,
-              0,
-            ),
-            sliver: SliverToBoxAdapter(
-              child: _SearchSourceNotice(
-                sources: [
-                  (
-                    name: MangaSources.shortLabel(source.id),
-                    message: NetworkErrors.friendly(bucketError),
-                  ),
-                ],
-              ),
+        unavailable.add((
+          name: source.name,
+          retry: () => unawaited(
+            _searchPage(
+              bucket.sourceId,
+              _query,
+              _searchGen,
+              bucket.currentPage,
             ),
           ),
-        );
+        ));
         continue;
       }
       catalogResponded = true;
@@ -1087,12 +1088,12 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
       );
     }
 
-    if (unreachable.isNotEmpty) {
+    if (unavailable.isNotEmpty) {
       slivers.add(
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(12, 20, 12, 4),
           sliver: SliverToBoxAdapter(
-            child: _SearchSourceNotice(sources: unreachable),
+            child: _SearchSourceNotice(sources: unavailable),
           ),
         ),
       );
@@ -1135,7 +1136,11 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
               final item = items[index];
               return KeyedSubtree(
                 key: ValueKey<String>('online-card-${item.url}'),
-                child: _buildOnlineMangaCard(item, favorites: favorites),
+                child: _buildOnlineMangaCard(
+                  item,
+                  favorites: favorites,
+                  showSource: _query.isEmpty,
+                ),
               );
             },
             childCount: items.length,
@@ -1264,7 +1269,7 @@ class _CatalogEmptyState extends StatelessWidget {
 
 /// Aviso compacto de una fuente que no pudo buscar. Va al final de los resultados.
 class _SearchSourceNotice extends StatelessWidget {
-  final List<({String name, String message})> sources;
+  final List<({String name, VoidCallback retry})> sources;
 
   const _SearchSourceNotice({required this.sources});
 
@@ -1288,7 +1293,7 @@ class _SearchSourceNotice extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(2, 2, 2, 6),
                 child: Text(
-                  'Fuentes sin conexión',
+                  'Fuentes que no respondieron',
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: scheme.onSurface.withAlpha(150),
                     fontWeight: FontWeight.w700,
@@ -1334,11 +1339,16 @@ class _SearchSourceNotice extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          sources[i].message,
+                          'No se pudo buscar en esta fuente. Puedes reintentarlo.',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: scheme.onSurface.withAlpha(160),
                             height: 1.25,
                           ),
+                        ),
+                        TextButton.icon(
+                          onPressed: sources[i].retry,
+                          icon: const Icon(Icons.refresh, size: 18),
+                          label: const Text('Reintentar búsqueda'),
                         ),
                       ],
                     ),

@@ -72,7 +72,8 @@ class DownloadQueueScreen extends StatelessWidget {
                               ? () => provider.moveJobDown(job.id)
                               : null,
                           onPrioritize:
-                              job.status != DownloadJobStatus.downloading
+                              activeJobs.length > 1 &&
+                                  job.status != DownloadJobStatus.downloading
                               ? () => provider.prioritizeJob(job.id)
                               : null,
                         ),
@@ -306,45 +307,36 @@ class _ActiveJobCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: hasChapterTotal ? progress : null,
-                    minHeight: 8,
-                    backgroundColor: theme.colorScheme.onSurface.withAlpha(20),
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                job.etaLabel == null
-                    ? (hasChapterTotal
-                          ? '${job.completedChapters}/${job.totalChapters} · $progressPercent%'
-                          : '$progressPercent%')
-                    : '${job.completedChapters}/${job.totalChapters} · $progressPercent% · ${job.etaLabel}',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-            ],
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: hasChapterTotal ? progress : null,
+              semanticsLabel: 'Capítulos completos',
+              semanticsValue: hasChapterTotal ? '$progressPercent %' : null,
+              minHeight: 8,
+              backgroundColor: theme.colorScheme.onSurface.withAlpha(20),
+              color: theme.colorScheme.primary,
+            ),
           ),
+          const SizedBox(height: 8),
+          Text(
+            hasChapterTotal
+                ? '${job.completedChapters} de ${job.totalChapters} capítulos completos · $progressPercent %'
+                : 'Preparando capítulos…',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          if (hasChapterTotal && job.pendingChapters > 0)
+            Text('${job.pendingChapters} capítulos pendientes'),
           const SizedBox(height: 14),
           Wrap(
             spacing: 16,
             runSpacing: 8,
             children: [
               _StatChip(
-                icon: Icons.menu_book_outlined,
-                label: 'Caps ${job.completedChapters}/${job.totalChapters}',
-              ),
-              _StatChip(
                 icon: Icons.layers_outlined,
-                label: 'Pags ${job.completedPages}/${job.totalPages}',
+                label: '${job.completedPages} páginas guardadas',
               ),
               _StatChip(
                 icon: Icons.network_check,
@@ -353,11 +345,20 @@ class _ActiveJobCard extends StatelessWidget {
               ),
             ],
           ),
+          if (job.totalPages > 0) ...[
+            const SizedBox(height: 8),
+            Text(
+              '${job.totalPages} páginas identificadas hasta ahora. El total puede aumentar al consultar los capítulos pendientes.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
           if (job.currentChapter != null) ...[
             const SizedBox(height: 10),
             Text(
-              'Actual: ${TitleSanitizer.clean(job.currentChapter!)}',
-              maxLines: 1,
+              '${job.status == DownloadJobStatus.failed ? 'Se detuvo en' : 'Actual'}: ${TitleSanitizer.clean(job.currentChapter!)}',
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurface.withAlpha(180),
@@ -379,22 +380,24 @@ class _ActiveJobCard extends StatelessWidget {
               onMoveDown != null ||
               onPrioritize != null) ...[
             const SizedBox(height: 12),
-            Row(
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
               children: [
-                IconButton.filledTonal(
-                  tooltip: 'Subir en la cola',
-                  onPressed: onMoveUp,
-                  icon: const Icon(Icons.keyboard_arrow_up_rounded),
-                ),
-                const SizedBox(width: 6),
-                IconButton.filledTonal(
-                  tooltip: 'Bajar en la cola',
-                  onPressed: onMoveDown,
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: OutlinedButton.icon(
+                if (onMoveUp != null)
+                  IconButton.filledTonal(
+                    tooltip: 'Subir en la cola',
+                    onPressed: onMoveUp,
+                    icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                  ),
+                if (onMoveDown != null)
+                  IconButton.filledTonal(
+                    tooltip: 'Bajar en la cola',
+                    onPressed: onMoveDown,
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                  ),
+                if (onPrioritize != null)
+                  OutlinedButton.icon(
                     onPressed: onPrioritize,
                     icon: const Icon(
                       Icons.vertical_align_top_rounded,
@@ -408,48 +411,58 @@ class _ActiveJobCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                ),
               ],
             ),
           ],
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.tonalIcon(
-                  onPressed: isPaused ? onResume : onPause,
-                  icon: Icon(
-                    isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-                    size: 22,
-                  ),
-                  label: Text(isPaused ? 'Reanudar' : 'Pausar'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final stacked =
+                  constraints.maxWidth < 340 ||
+                  MediaQuery.textScalerOf(context).scale(14) > 18;
+              final resume = FilledButton.icon(
+                onPressed: isPaused ? onResume : onPause,
+                icon: Icon(
+                  job.status == DownloadJobStatus.failed
+                      ? Icons.refresh_rounded
+                      : isPaused
+                      ? Icons.play_arrow_rounded
+                      : Icons.pause_rounded,
+                  size: 22,
+                ),
+                label: Text(
+                  job.status == DownloadJobStatus.failed
+                      ? 'Reintentar pendientes'
+                      : isPaused
+                      ? 'Reanudar'
+                      : 'Pausar',
+                ),
+              );
+              final cancel = OutlinedButton.icon(
+                onPressed: onStop,
+                icon: const Icon(Icons.stop_rounded, size: 22),
+                label: const Text('Cancelar'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: theme.colorScheme.error,
+                  side: BorderSide(
+                    color: theme.colorScheme.error.withAlpha(120),
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onStop,
-                  icon: const Icon(Icons.stop_rounded, size: 22),
-                  label: const Text('Cancelar'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: theme.colorScheme.error,
-                    side: BorderSide(
-                      color: theme.colorScheme.error.withAlpha(120),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+              );
+              if (stacked) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [resume, const SizedBox(height: 8), cancel],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: resume),
+                  const SizedBox(width: 10),
+                  Expanded(child: cancel),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -462,6 +475,55 @@ class _ArchiveCard extends StatelessWidget {
   final VoidCallback onRemove;
 
   const _ArchiveCard({required this.entry, required this.onRemove});
+
+  Future<void> _showDetails(BuildContext context) => showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (context) => SafeArea(
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.7,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Text(
+                'Capítulos confirmados · ${TitleSanitizer.clean(entry.title)}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            Expanded(
+              child: entry.completedTitles.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'Este registro no tiene detalle de capítulos.',
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: entry.completedTitles.length,
+                      itemBuilder: (context, index) => ListTile(
+                        leading: const Icon(Icons.check_circle_outline),
+                        title: Text(
+                          TitleSanitizer.clean(entry.completedTitles[index]),
+                        ),
+                      ),
+                    ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cerrar'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -476,81 +538,102 @@ class _ArchiveCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: theme.colorScheme.onSurface.withAlpha(18)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SizedBox(
-              width: 62,
-              height: 88,
-              child: CachedThumbnail(
-                sourcePath: entry.coverUrl,
-                size: 360,
-                fit: BoxFit.cover,
-                placeholderBuilder: (_) => Container(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  child: Icon(
-                    Icons.auto_stories_outlined,
-                    color: theme.colorScheme.onSurface.withAlpha(100),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    height: 1.15,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isCompleted
-                        ? const Color(0x3334D399)
-                        : theme.colorScheme.onSurface.withAlpha(20),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    entry.reason,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: isCompleted
-                          ? const Color(0xFF34D399)
-                          : theme.colorScheme.onSurface.withAlpha(180),
-                      fontWeight: FontWeight.w700,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: 62,
+                  height: 88,
+                  child: CachedThumbnail(
+                    sourcePath: entry.coverUrl,
+                    size: 360,
+                    fit: BoxFit.cover,
+                    placeholderBuilder: (_) => Container(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      child: Icon(
+                        Icons.auto_stories_outlined,
+                        color: theme.colorScheme.onSurface.withAlpha(100),
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  '${entry.completedChapters} caps · ${entry.completedPages}/${entry.totalPages} pags\n${entry.rangeLabel}',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withAlpha(170),
-                    fontWeight: FontWeight.w600,
-                  ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        height: 1.15,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isCompleted
+                            ? const Color(0x3334D399)
+                            : theme.colorScheme.onSurface.withAlpha(20),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        entry.reason,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: isCompleted
+                              ? const Color(0xFF34D399)
+                              : theme.colorScheme.onSurface.withAlpha(180),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${entry.completedChapters} capítulos · ${entry.completedPages} páginas guardadas',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withAlpha(170),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
+              IconButton(
+                tooltip: 'Quitar del historial',
+                onPressed: onRemove,
+                icon: const Icon(Icons.close_rounded, size: 20),
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(44, 44),
+                  backgroundColor: theme.colorScheme.onSurface.withAlpha(18),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            TitleSanitizer.clean(entry.rangeLabel),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          IconButton.filledTonal(
-            onPressed: onRemove,
-            icon: const Icon(Icons.close_rounded, size: 20),
-            style: IconButton.styleFrom(
-              minimumSize: const Size(44, 44),
-              backgroundColor: theme.colorScheme.onSurface.withAlpha(18),
-            ),
+          TextButton.icon(
+            onPressed: () => _showDetails(context),
+            icon: const Icon(Icons.list_alt_rounded, size: 18),
+            label: const Text('Ver detalles'),
           ),
         ],
       ),
@@ -568,18 +651,20 @@ class _StatChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 16, color: theme.colorScheme.primary),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w700,
+    return Text.rich(
+      TextSpan(
+        children: [
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: Icon(icon, size: 16, color: theme.colorScheme.primary),
+            ),
           ),
-        ),
-      ],
+          TextSpan(text: label),
+        ],
+      ),
+      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
     );
   }
 }

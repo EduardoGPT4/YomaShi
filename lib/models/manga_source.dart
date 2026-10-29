@@ -28,7 +28,7 @@ class MangaSource {
     MangaSourceKind.scraping => 'Scraping',
   };
 
-  String get detailLine => '$kindLabel · $languageLabel';
+  String get detailLine => languageLabel;
 }
 
 /// Catálogo de fuentes conocidas por la app (v2.0).

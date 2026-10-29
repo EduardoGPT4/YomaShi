@@ -203,31 +203,33 @@ class _OfflineLibraryScreenState extends State<OfflineLibraryScreen> {
                     sliver: SliverToBoxAdapter(
                       child: Column(
                         children: [
-                          Row(
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Expanded(
-                                child: SearchBarField(
-                                  controller: _searchController,
-                                  hintText: 'Buscar en offline',
-                                  onChanged: (_) => setState(() {}),
-                                  onClear: () {
-                                    _searchController.clear();
-                                    setState(() {});
+                              SearchBarField(
+                                controller: _searchController,
+                                hintText: 'Buscar en tu biblioteca',
+                                onChanged: (_) => setState(() {}),
+                                onClear: () {
+                                  _searchController.clear();
+                                  setState(() {});
+                                },
+                              ),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: FilterIconButton(
+                                  active: _filters.hasActiveFilters,
+                                  onPressed: () async {
+                                    await MangaFilterSheet.show(
+                                      context: context,
+                                      initialFilters: _filters,
+                                      isOnline: false,
+                                      onApply: (filters) {
+                                        setState(() => _filters = filters);
+                                      },
+                                    );
                                   },
                                 ),
-                              ),
-                              FilterIconButton(
-                                active: _filters.hasActiveFilters,
-                                onPressed: () async {
-                                  await MangaFilterSheet.show(
-                                    context: context,
-                                    initialFilters: _filters,
-                                    isOnline: false,
-                                    onApply: (filters) {
-                                      setState(() => _filters = filters);
-                                    },
-                                  );
-                                },
                               ),
                             ],
                           ),

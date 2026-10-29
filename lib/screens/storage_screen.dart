@@ -9,9 +9,26 @@ import '../services/storage_metrics.dart';
 import '../utils/thumbnail_service.dart';
 import '../services/repair_service.dart';
 import '../services/reader_crop_service.dart';
+import '../utils/title_sanitizer.dart';
+
+class StorageSnapshot {
+  final Map<String, int> sizes;
+  final int cache;
+  final int thumbnails;
+  final int? free;
+  const StorageSnapshot({
+    required this.sizes,
+    required this.cache,
+    required this.thumbnails,
+    this.free,
+  });
+}
+
+enum _StorageOrder { size, title }
 
 class StorageScreen extends StatefulWidget {
-  const StorageScreen({super.key});
+  final Future<StorageSnapshot> Function(List<Manga>, String?)? loadMetrics;
+  const StorageScreen({super.key, this.loadMetrics});
   @override
   State<StorageScreen> createState() => _StorageScreenState();
 }
@@ -20,7 +37,11 @@ class _StorageScreenState extends State<StorageScreen> {
   Map<String, int> _sizes = {};
   int _cache = 0, _thumbnails = 0;
   int? _free;
-  bool _busy = false;
+  bool _busy = true;
+  String _activity = 'Calculando almacenamiento…';
+  bool _hasMeasurement = false;
+  String _query = '';
+  _StorageOrder _order = _StorageOrder.size;
   String? _error;
   @override
   void initState() {
@@ -34,19 +55,22 @@ class _StorageScreenState extends State<StorageScreen> {
     final root = context.read<DownloadQueueProvider>().downloadRoot;
     setState(() {
       _busy = true;
+      _activity = 'Calculando almacenamiento…';
+      _hasMeasurement = false;
       _error = null;
     });
     try {
-      final sizes = await StorageMaintenance.measure(library.mangas);
-      final cache = await ImageRepository.shared.cacheSize();
-      final thumbnails = await ThumbnailService.cacheSize();
-      final free = root == null ? null : await StorageMetrics.freeBytes(root);
+      final snapshot = await (widget.loadMetrics ?? _loadMetrics)(
+        List<Manga>.of(library.mangas),
+        root,
+      );
       if (mounted) {
         setState(() {
-          _sizes = sizes;
-          _cache = cache;
-          _thumbnails = thumbnails;
-          _free = free;
+          _sizes = snapshot.sizes;
+          _cache = snapshot.cache;
+          _thumbnails = snapshot.thumbnails;
+          _free = snapshot.free;
+          _hasMeasurement = true;
         });
       }
     } catch (error) {
@@ -56,15 +80,68 @@ class _StorageScreenState extends State<StorageScreen> {
     }
   }
 
+  static Future<StorageSnapshot> _loadMetrics(
+    List<Manga> mangas,
+    String? root,
+  ) async {
+    final sizes = await StorageMaintenance.measure(mangas);
+    final cache = await ImageRepository.shared.cacheSize();
+    final thumbnails = await ThumbnailService.cacheSize();
+    final free = root == null ? null : await StorageMetrics.freeBytes(root);
+    return StorageSnapshot(
+      sizes: sizes,
+      cache: cache,
+      thumbnails: thumbnails,
+      free: free,
+    );
+  }
+
   Future<void> _run(Future<void> Function() action) async {
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _activity = 'Aplicando cambios…';
+    });
+    String? actionError;
     try {
       await action();
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+      actionError = error.toString();
     } finally {
       if (mounted) await _refresh();
+      if (mounted && actionError != null) setState(() => _error = actionError);
     }
+  }
+
+  Future<void> _migrate() async {
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Actualizar carpetas antiguas'),
+        content: const Text(
+          'Añade los metadatos de YomaShi a las carpetas que aún no los tienen. Las imágenes, los nombres de las carpetas y tu progreso se conservan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Actualizar'),
+          ),
+        ],
+      ),
+    );
+    if (yes != true || !mounted) return;
+    await _run(() async {
+      final library = context.read<LibraryProvider>();
+      final count = await StorageMaintenance.migrateLegacy(library.mangas);
+      await library.rescan();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$count carpetas actualizadas.')));
+    });
   }
 
   Future<void> _delete(Manga manga, String path) async {
@@ -99,11 +176,41 @@ class _StorageScreenState extends State<StorageScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final mangas = context.select<LibraryProvider, List<Manga>>(
+    final allMangas = context.select<LibraryProvider, List<Manga>>(
       (p) => p.mangas,
     );
+    final mangas =
+        allMangas
+            .where(
+              (manga) => TitleSanitizer.clean(
+                manga.title,
+              ).toLowerCase().contains(_query.toLowerCase()),
+            )
+            .toList()
+          ..sort((a, b) {
+            if (_order == _StorageOrder.size) {
+              final bySize = (_sizes[b.path] ?? 0).compareTo(
+                _sizes[a.path] ?? 0,
+              );
+              if (bySize != 0) return bySize;
+            }
+            return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+          });
+    final measured = _hasMeasurement && !_busy;
+    String sizeLabel(int bytes) =>
+        measured ? StorageMetrics.format(bytes) : '—';
+    final libraryBytes = _sizes.values.fold(0, (a, b) => a + b);
     return Scaffold(
-      appBar: AppBar(title: const Text('Almacenamiento')),
+      appBar: AppBar(
+        title: const Text('Almacenamiento'),
+        actions: [
+          IconButton(
+            tooltip: 'Actualizar tamaños',
+            onPressed: _busy ? null : _refresh,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
       body: ListView.builder(
         itemCount: mangas.length + 1,
         itemBuilder: (context, index) {
@@ -113,15 +220,24 @@ class _StorageScreenState extends State<StorageScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (_busy) const LinearProgressIndicator(),
+                  if (_busy) ...[
+                    const LinearProgressIndicator(),
+                    const SizedBox(height: 12),
+                    Text(_activity),
+                    const SizedBox(height: 12),
+                  ],
                   if (_error != null) Text(_error!),
                   Text(
-                    'Biblioteca: ${StorageMetrics.format(_sizes.values.fold(0, (a, b) => a + b))}',
+                    'Total de biblioteca y caché: ${sizeLabel(libraryBytes + _cache + _thumbnails)}',
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
+                  const SizedBox(height: 8),
+                  Text('Biblioteca: ${sizeLabel(libraryBytes)}'),
+                  Text('Imágenes temporales: ${sizeLabel(_cache)}'),
+                  Text('Miniaturas: ${sizeLabel(_thumbnails)}'),
                   if (_free != null)
-                    Text('Espacio libre: ${StorageMetrics.format(_free!)}'),
-                  Text('Imágenes temporales: ${StorageMetrics.format(_cache)}'),
-                  Text('Miniaturas: ${StorageMetrics.format(_thumbnails)}'),
+                    Text('Espacio libre: ${sizeLabel(_free!)}'),
+                  const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     children: [
@@ -151,27 +267,68 @@ class _StorageScreenState extends State<StorageScreen> {
                         child: const Text('Limpiar parciales antiguos'),
                       ),
                       TextButton(
-                        onPressed: _busy
-                            ? null
-                            : () => _run(() async {
-                                final library = context.read<LibraryProvider>();
-                                await StorageMaintenance.migrateLegacy(
-                                  library.mangas,
-                                );
-                                await library.rescan();
-                              }),
-                        child: const Text('Actualizar biblioteca antigua'),
+                        onPressed: _busy ? null : _migrate,
+                        child: const Text('Actualizar carpetas antiguas'),
                       ),
                     ],
                   ),
+                  Text(
+                    'La actualización añade metadatos a carpetas antiguas sin mover tus imágenes.${_busy ? ' Las herramientas estarán disponibles al terminar el cálculo.' : ''}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 20),
+                  TextField(
+                    decoration: const InputDecoration(
+                      labelText: 'Buscar en tu biblioteca',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                    onChanged: (value) => setState(() => _query = value.trim()),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<_StorageOrder>(
+                    initialValue: _order,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Ordenar por'),
+                    items: const [
+                      DropdownMenuItem(
+                        value: _StorageOrder.size,
+                        child: Text(
+                          'Mayor tamaño',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: _StorageOrder.title,
+                        child: Text(
+                          'Título A–Z',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) setState(() => _order = value);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Text('${mangas.length} de ${allMangas.length} mangas'),
+                  if (mangas.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Text(
+                        'No hay mangas que coincidan con la búsqueda.',
+                      ),
+                    ),
                 ],
               ),
             );
           }
           final manga = mangas[index - 1];
           return ExpansionTile(
-            title: Text(manga.title),
-            subtitle: Text(StorageMetrics.format(_sizes[manga.path] ?? 0)),
+            key: PageStorageKey(manga.path),
+            title: Text(TitleSanitizer.clean(manga.title)),
+            subtitle: Text(sizeLabel(_sizes[manga.path] ?? 0)),
             children: [
               ListTile(
                 leading: const Icon(Icons.healing),

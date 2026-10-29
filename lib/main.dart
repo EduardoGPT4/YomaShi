@@ -24,6 +24,7 @@ import 'services/download_notification_service.dart';
 import 'services/background_downloads.dart';
 import 'models/ui_density.dart';
 import 'widgets/app_metrics.dart';
+import 'widgets/app_theme.dart';
 import 'widgets/onboarding_flow.dart';
 import 'widgets/startup_storage.dart';
 
@@ -110,7 +111,7 @@ class MangaReaderApp extends StatelessWidget {
       ],
       child: Consumer2<ThemeAccentProvider, DensityProvider>(
         builder: (context, accent, density, _) {
-          final theme = _buildTheme(
+          final theme = buildYomashiTheme(
             accent.primary,
             density.density == UiDensity.comfortable
                 ? AppMetrics.comfortable
@@ -124,203 +125,6 @@ class MangaReaderApp extends StatelessWidget {
       ),
     );
   }
-}
-
-ThemeData _buildTheme(Color primary, AppMetrics metrics) {
-  const background = Color(0xFF090909);
-  const surface = Color(0xFF151515);
-  const surfaceVariant = Color(0xFF202020);
-  const surfaceSoft = Color(0xFF2A2A2A);
-  const secondary = Color(0xFFC7C7C7);
-  const tertiary = Color(0xFF9A9A9A);
-  const outline = Color(0xFF343434);
-  const inverseSurface = Color(0xFFF1F1F1);
-
-  final colorScheme =
-      ColorScheme.fromSeed(
-        seedColor: primary,
-        brightness: Brightness.dark,
-      ).copyWith(
-        surface: surface,
-        onSurface: Colors.white,
-        surfaceContainerHighest: surfaceVariant,
-        onSurfaceVariant: const Color(0xFFD0D0D0),
-        primary: primary,
-        onPrimary: Colors.white,
-        primaryContainer: surfaceSoft,
-        onPrimaryContainer: Colors.white,
-        secondary: secondary,
-        onSecondary: Colors.black,
-        secondaryContainer: surfaceSoft,
-        onSecondaryContainer: Colors.white,
-        tertiary: tertiary,
-        onTertiary: Colors.black,
-        tertiaryContainer: surfaceSoft,
-        onTertiaryContainer: Colors.white,
-        error: const Color(0xFFD4A3A3),
-        onError: Colors.black,
-        errorContainer: const Color(0xFF2A1F1F),
-        onErrorContainer: Colors.white,
-        outline: outline,
-        outlineVariant: const Color(0xFF2B2B2B),
-        shadow: Colors.black,
-        scrim: Colors.black,
-        inverseSurface: inverseSurface,
-        onInverseSurface: Colors.black,
-        inversePrimary: const Color(0xFF777777),
-        surfaceTint: primary,
-      );
-
-  return ThemeData(
-    useMaterial3: true,
-    scaffoldBackgroundColor: background,
-    canvasColor: surface,
-    colorScheme: colorScheme,
-    visualDensity: metrics.isCompact
-        ? VisualDensity.compact
-        : VisualDensity.standard,
-    splashFactory: InkSparkle.splashFactory,
-    appBarTheme: AppBarTheme(
-      backgroundColor: Colors.transparent,
-      foregroundColor: colorScheme.onSurface,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      centerTitle: false,
-      toolbarHeight: metrics.isCompact ? 48 : 56,
-      titleTextStyle: TextStyle(
-        fontSize: metrics.isCompact ? 18 : 20,
-        fontWeight: FontWeight.w800,
-        letterSpacing: -0.3,
-        color: Colors.white,
-      ),
-    ),
-    floatingActionButtonTheme: FloatingActionButtonThemeData(
-      backgroundColor: colorScheme.secondary,
-      foregroundColor: colorScheme.onSecondary,
-      elevation: 4,
-    ),
-    cardTheme: CardThemeData(
-      color: surface,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-      margin: EdgeInsets.zero,
-    ),
-    chipTheme: ChipThemeData(
-      backgroundColor: surfaceVariant,
-      padding: EdgeInsets.symmetric(horizontal: metrics.isCompact ? 6 : 8),
-      labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-      labelStyle: TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.w700,
-        fontSize: metrics.isCompact ? 12 : 13,
-      ),
-      side: BorderSide(color: outline),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-    ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: colorScheme.primary,
-        foregroundColor: colorScheme.onPrimary,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700),
-      ),
-    ),
-    filledButtonTheme: FilledButtonThemeData(
-      style: FilledButton.styleFrom(
-        backgroundColor: colorScheme.primary,
-        foregroundColor: colorScheme.onPrimary,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700),
-      ),
-    ),
-    textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(
-        foregroundColor: colorScheme.primary,
-        textStyle: const TextStyle(fontWeight: FontWeight.w700),
-      ),
-    ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: surface,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
-        borderSide: BorderSide(color: outline),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
-        borderSide: BorderSide(color: outline),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
-        borderSide: BorderSide(color: colorScheme.primary),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-    ),
-    outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        foregroundColor: colorScheme.primary,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        side: BorderSide(color: outline),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700),
-      ),
-    ),
-    snackBarTheme: SnackBarThemeData(
-      behavior: SnackBarBehavior.floating,
-      backgroundColor: surfaceSoft,
-      contentTextStyle: const TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.w600,
-      ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-    ),
-    dialogTheme: DialogThemeData(
-      backgroundColor: surface,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-    ),
-    bottomSheetTheme: const BottomSheetThemeData(
-      backgroundColor: surface,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-    ),
-    navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      height: metrics.navHeight,
-      indicatorColor: colorScheme.primary.withAlpha(40),
-      labelTextStyle: WidgetStateProperty.resolveWith((states) {
-        final selected = states.contains(WidgetState.selected);
-        return TextStyle(
-          fontSize: metrics.navLabelSize,
-          fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-          letterSpacing: -0.1,
-          height: 1.1,
-        );
-      }),
-      iconTheme: WidgetStateProperty.resolveWith((states) {
-        final selected = states.contains(WidgetState.selected);
-        return IconThemeData(
-          size: metrics.navIconSize,
-          color: selected
-              ? colorScheme.primary
-              : colorScheme.onSurface.withAlpha(170),
-        );
-      }),
-    ),
-    progressIndicatorTheme: ProgressIndicatorThemeData(
-      color: colorScheme.primary,
-      linearTrackColor: colorScheme.onSurface.withAlpha(24),
-    ),
-    dividerTheme: DividerThemeData(
-      color: colorScheme.onSurface.withAlpha(18),
-      space: 1,
-    ),
-  );
 }
 
 class _AppLifecycleHost extends StatefulWidget {

@@ -34,6 +34,7 @@ import '../utils/fs_scanner.dart';
 import '../utils/reader_paging.dart';
 import '../services/online_catalog_service.dart';
 import '../widgets/chapter_drawer.dart';
+import '../widgets/reader_settings_panel.dart';
 
 class ReaderScreen extends StatefulWidget {
   final Manga manga;
@@ -84,6 +85,8 @@ class _ReaderScreenState extends State<ReaderScreen>
   bool _showControls = true;
   bool _edgeSwipeHandled = false;
   bool _loadingChapter = true;
+  bool _readerPanelOpen = false;
+  int _drawerRevision = 0;
   int _chapterOpenGen = 0;
   Timer? _controlsHideTimer;
 
@@ -225,7 +228,7 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   void _scheduleControlsHide() {
     _controlsHideTimer?.cancel();
-    if (!_showControls) {
+    if (!_showControls || _readerPanelOpen) {
       return;
     }
     _controlsHideTimer = Timer(const Duration(seconds: 4), () {
@@ -371,7 +374,7 @@ class _ReaderScreenState extends State<ReaderScreen>
   }
 
   String _settingsKey(ReaderSettingsProvider settings) =>
-      '${settings.readingDirection.name}|${settings.doublePage}|${settings.continuousVertical}|${settings.coverAlone}|${settings.cropWhite}|${settings.orientation}';
+      '${settings.readingDirection.name}|${settings.doublePage}|${settings.continuousVertical}|${settings.coverAlone}|${settings.cropWhite}|${settings.orientation}|${settings.pageFitMode.name}|${settings.freeZoom}';
   void _onSettingsChanged() {
     if (!mounted || _settings == null) return;
     final next = _settingsKey(_settings!);
@@ -492,13 +495,13 @@ class _ReaderScreenState extends State<ReaderScreen>
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Ir a pagina'),
+          title: const Text('Ir a página'),
           content: TextField(
             controller: controller,
             keyboardType: TextInputType.number,
             autofocus: true,
             decoration: InputDecoration(
-              labelText: 'Pagina (1-${pages.length})',
+              labelText: 'Página (1-${pages.length})',
             ),
             onSubmitted: (value) {
               final n = int.tryParse(value);
@@ -662,7 +665,142 @@ class _ReaderScreenState extends State<ReaderScreen>
   }
 
   void _openDrawer() {
+    _controlsHideTimer?.cancel();
+    setState(() => _drawerRevision++);
     _scaffoldKey.currentState?.openEndDrawer();
+  }
+
+  Future<void> _openReaderSettings() async {
+    _controlsHideTimer?.cancel();
+    _readerPanelOpen = true;
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: true,
+        builder: (sheetContext) => FractionallySizedBox(
+          heightFactor: .88,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 8, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Ajustes del lector',
+                        style: Theme.of(sheetContext).textTheme.titleLarge,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Cerrar ajustes',
+                      onPressed: () => Navigator.pop(sheetContext),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              const Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  child: ReaderSettingsPanel(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } finally {
+      _readerPanelOpen = false;
+      if (mounted) {
+        setState(() => _showControls = true);
+        _scheduleControlsHide();
+      }
+    }
+  }
+
+  void _toggleOriginalQuality() {
+    final page = _pageIndex;
+    setState(() {
+      _originalQuality = !_originalQuality;
+      _imageRevision++;
+    });
+    if (OnlineCatalogService.sourceIdForRef(_currentChapter?.path) ==
+        'mangadex') {
+      _chapterPagesCache.remove(_currentChapter!.path);
+      unawaited(_openChapter(_chapterIndex, initialPage: page));
+    } else {
+      _precacheVisiblePages();
+    }
+  }
+
+  Future<void> _toggleChapterRead() async {
+    final chapter = _currentChapter;
+    if (chapter == null) return;
+    final reader = context.read<ChapterReadProvider>();
+    final wasRead = reader.isRead(chapter.path);
+    await MyAnimeListService.shared
+        .registerManga(widget.manga, chapters: [chapter])
+        .catchError((_) {});
+    if (!mounted) return;
+    await reader.toggle(chapter.path);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          wasRead
+              ? 'Capítulo marcado como no leído'
+              : 'Capítulo marcado como leído',
+        ),
+        action: SnackBarAction(
+          label: 'Deshacer',
+          onPressed: () => unawaited(
+            wasRead
+                ? reader.markRead(chapter.path)
+                : reader.markUnread(chapter.path),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleReaderAction(String action) async {
+    _readerPanelOpen = true;
+    try {
+      switch (action) {
+        case 'save':
+          await _bookmark();
+        case 'list':
+          await _bookmarks();
+        case 'source':
+          await _alternatives();
+        case 'quality':
+          _toggleOriginalQuality();
+        case 'read':
+          await _toggleChapterRead();
+        case 'previous':
+          _goPrevChapter();
+        case 'next':
+          await _goNextChapter();
+        case 'mal':
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => MyAnimeListScreen(manga: widget.manga),
+            ),
+          );
+          if (mounted) {
+            unawaited(
+              MyAnimeListService.shared
+                  .registerManga(widget.manga, chapters: [?_currentChapter])
+                  .catchError((_) {}),
+            );
+          }
+      }
+    } finally {
+      _readerPanelOpen = false;
+      if (mounted) _scheduleControlsHide();
+    }
   }
 
   Future<void> _goNextChapter() async {
@@ -698,7 +836,7 @@ class _ReaderScreenState extends State<ReaderScreen>
     if (_chapterIndex + 1 >= _chapters.length) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('No hay mas capitulos.')));
+      ).showSnackBar(const SnackBar(content: Text('No hay más capítulos.')));
       return;
     }
     unawaited(_openChapter(_chapterIndex + 1, initialPage: 0));
@@ -707,7 +845,7 @@ class _ReaderScreenState extends State<ReaderScreen>
   void _goPrevChapter({bool lastPage = false}) {
     if (_chapterIndex - 1 < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Estas en el primer capitulo.')),
+        const SnackBar(content: Text('Estás en el primer capítulo.')),
       );
       return;
     }
@@ -814,7 +952,16 @@ class _ReaderScreenState extends State<ReaderScreen>
 
     return Scaffold(
       key: _scaffoldKey,
+      onEndDrawerChanged: (open) {
+        _readerPanelOpen = open;
+        if (open) {
+          _controlsHideTimer?.cancel();
+        } else {
+          _scheduleControlsHide();
+        }
+      },
       endDrawer: ChapterDrawer(
+        key: ValueKey('reader-chapters-$_drawerRevision'),
         chapters: _chapters,
         currentIndex: _chapterIndex,
         onSelect: (index) {
@@ -1030,7 +1177,7 @@ class _ReaderScreenState extends State<ReaderScreen>
       left: 0,
       right: 0,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
@@ -1044,6 +1191,7 @@ class _ReaderScreenState extends State<ReaderScreen>
         child: Row(
           children: [
             IconButton(
+              tooltip: 'Volver',
               onPressed: () => Navigator.of(context).maybePop(),
               icon: const Icon(Icons.arrow_back),
             ),
@@ -1068,117 +1216,108 @@ class _ReaderScreenState extends State<ReaderScreen>
               ),
             ),
             if (settings.showPageNumber)
-              GestureDetector(
-                onTap: () => unawaited(_goToPageDialog()),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    '$currentPage/$totalPages',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w700,
+              Semantics(
+                label: 'Página $currentPage de $totalPages',
+                hint: 'Ir a una página',
+                button: true,
+                child: Tooltip(
+                  message: 'Ir a una página',
+                  child: TextButton(
+                    onPressed: totalPages == 0
+                        ? null
+                        : () => unawaited(_goToPageDialog()),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      backgroundColor: theme.colorScheme.primary.withAlpha(28),
+                      tapTargetSize: MaterialTapTargetSize.padded,
+                    ),
+                    child: ExcludeSemantics(
+                      child: Text('$currentPage/$totalPages'),
                     ),
                   ),
                 ),
               ),
+            IconButton(
+              tooltip: 'Ajustes del lector',
+              onPressed: () => unawaited(_openReaderSettings()),
+              icon: const Icon(Icons.tune_rounded),
+            ),
             PopupMenuButton<String>(
-              tooltip: 'Marcadores y fuentes',
-              onSelected: (v) {
-                if (v == 'save') unawaited(_bookmark());
-                if (v == 'list') unawaited(_bookmarks());
-                if (v == 'source') unawaited(_alternatives());
-                if (v == 'mal') {
-                  Navigator.of(context)
-                      .push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              MyAnimeListScreen(manga: widget.manga),
-                        ),
-                      )
-                      .then((_) {
-                        if (mounted) {
-                          unawaited(
-                            MyAnimeListService.shared
-                                .registerManga(
-                                  widget.manga,
-                                  chapters: [?_currentChapter],
-                                )
-                                .catchError((_) {}),
-                          );
-                        }
-                      });
-                }
+              tooltip: 'Más opciones de lectura',
+              onOpened: () {
+                _controlsHideTimer?.cancel();
+                _readerPanelOpen = true;
               },
-              itemBuilder: (_) => const [
-                PopupMenuItem(
-                  value: 'mal',
-                  child: Text('Vincular con MyAnimeList'),
-                ),
-                PopupMenuItem(
-                  value: 'save',
-                  child: Text('Añadir/quitar marcador'),
-                ),
-                PopupMenuItem(value: 'list', child: Text('Mis marcadores')),
-                PopupMenuItem(
-                  value: 'source',
-                  child: Text('Buscar capítulo en otra fuente'),
-                ),
-              ],
-            ),
-            IconButton(
-              tooltip: 'Calidad original para ampliar',
-              icon: Icon(_originalQuality ? Icons.hd : Icons.hd_outlined),
-              onPressed: () {
-                final page = _pageIndex;
-                setState(() {
-                  _originalQuality = !_originalQuality;
-                  _imageRevision++;
-                });
-                if (OnlineCatalogService.sourceIdForRef(
-                      _currentChapter?.path,
-                    ) ==
-                    'mangadex') {
-                  _chapterPagesCache.remove(_currentChapter!.path);
-                  unawaited(_openChapter(_chapterIndex, initialPage: page));
-                } else {
-                  _precacheVisiblePages();
-                }
+              onCanceled: () {
+                _readerPanelOpen = false;
+                _scheduleControlsHide();
               },
-            ),
-            IconButton(
-              tooltip: 'Marcar capitulo leido',
-              onPressed: chapter == null
-                  ? null
-                  : () async {
-                      final reader = context.read<ChapterReadProvider>();
-                      final wasRead = reader.isRead(chapter.path);
-                      await MyAnimeListService.shared
-                          .registerManga(widget.manga, chapters: [chapter])
-                          .catchError((_) {});
-                      if (!mounted) return;
-                      await reader.toggle(chapter.path);
-                      if (!mounted) {
-                        return;
-                      }
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            wasRead
-                                ? 'Capitulo marcado como no leido'
-                                : 'Capitulo marcado como leido',
-                          ),
-                          duration: const Duration(seconds: 1),
-                        ),
-                      );
-                    },
-              icon: const Icon(Icons.done_all_rounded),
+              onSelected: (action) => unawaited(_handleReaderAction(action)),
+              itemBuilder: (_) {
+                final isRead =
+                    chapter != null &&
+                    context.read<ChapterReadProvider>().isRead(chapter.path);
+                PopupMenuItem<String> item(
+                  String value,
+                  IconData icon,
+                  String label, {
+                  bool enabled = true,
+                }) => PopupMenuItem<String>(
+                  value: value,
+                  enabled: enabled,
+                  child: Row(
+                    children: [
+                      Icon(icon, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(label)),
+                    ],
+                  ),
+                );
+                return [
+                  item(
+                    'quality',
+                    _originalQuality ? Icons.hd : Icons.hd_outlined,
+                    _originalQuality
+                        ? 'Usar imágenes optimizadas'
+                        : 'Usar calidad original',
+                  ),
+                  item(
+                    'read',
+                    Icons.done_all,
+                    isRead ? 'Marcar como no leído' : 'Marcar como leído',
+                    enabled: chapter != null,
+                  ),
+                  const PopupMenuDivider(),
+                  item(
+                    'save',
+                    Icons.bookmark_add_outlined,
+                    'Añadir o quitar marcador',
+                  ),
+                  item('list', Icons.bookmarks_outlined, 'Mis marcadores'),
+                  item(
+                    'source',
+                    Icons.travel_explore,
+                    'Buscar capítulo en otra fuente',
+                  ),
+                  item('mal', Icons.sync_alt, 'Vincular con MyAnimeList'),
+                  const PopupMenuDivider(),
+                  item(
+                    'previous',
+                    Icons.skip_previous,
+                    'Capítulo anterior',
+                    enabled: _chapterIndex > 0,
+                  ),
+                  item(
+                    'next',
+                    Icons.skip_next,
+                    'Capítulo siguiente',
+                    enabled:
+                        _chapterIndex + 1 < _chapters.length ||
+                        _readingDetail.hasMoreChapters,
+                  ),
+                ];
+              },
             ),
           ],
         ),
@@ -1222,6 +1361,8 @@ class _ReaderScreenState extends State<ReaderScreen>
                 ),
                 child: Slider(
                   value: progress.clamp(0.0, 1.0),
+                  semanticFormatterCallback: (value) =>
+                      'Página ${(value * (totalPages - 1)).round() + 1} de $totalPages',
                   onChanged: (value) {
                     final target = (value * (totalPages - 1)).round();
                     _animateToPage(target, settings);
@@ -1234,40 +1375,20 @@ class _ReaderScreenState extends State<ReaderScreen>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(
-                  tooltip: 'Capitulo anterior',
-                  onPressed: _goPrevChapter,
-                  icon: const Icon(Icons.skip_previous),
-                ),
-                IconButton(
-                  tooltip: 'Pagina anterior',
+                  tooltip: 'Página anterior',
                   onPressed: () => _goToRelativePage(-1),
                   icon: const Icon(Icons.chevron_left),
                 ),
-                IconButton(
-                  tooltip: settings.readingDirection.label,
-                  onPressed: settings.toggleMode,
-                  icon: Icon(
-                    settings.verticalMode
-                        ? Icons.swap_vert
-                        : settings.isRightToLeft
-                        ? Icons.format_textdirection_r_to_l
-                        : Icons.format_textdirection_l_to_r,
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Capitulos',
+                TextButton.icon(
                   onPressed: _openDrawer,
                   icon: const Icon(Icons.menu_book_outlined),
+                  label: const Text('Capítulos'),
+                  style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
                 ),
                 IconButton(
-                  tooltip: 'Pagina siguiente',
+                  tooltip: 'Página siguiente',
                   onPressed: () => _goToRelativePage(1),
                   icon: const Icon(Icons.chevron_right),
-                ),
-                IconButton(
-                  tooltip: 'Capitulo siguiente',
-                  onPressed: _goNextChapter,
-                  icon: const Icon(Icons.skip_next),
                 ),
               ],
             ),
@@ -1291,7 +1412,7 @@ class _ReaderScreenState extends State<ReaderScreen>
             ),
             const SizedBox(height: 12),
             const Text(
-              'Este capitulo no tiene paginas disponibles.',
+              'Este capítulo no tiene páginas disponibles.',
               textAlign: TextAlign.center,
             ),
           ],
@@ -1307,7 +1428,7 @@ class _ReaderScreenState extends State<ReaderScreen>
         children: [
           CircularProgressIndicator(color: theme.colorScheme.primary),
           const SizedBox(height: 12),
-          Text('Cargando capitulo...', style: theme.textTheme.bodyMedium),
+          Text('Cargando capítulo…', style: theme.textTheme.bodyMedium),
         ],
       ),
     );

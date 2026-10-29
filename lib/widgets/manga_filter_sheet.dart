@@ -68,145 +68,145 @@ class _MangaFilterSheetState extends State<MangaFilterSheet> {
     final theme = Theme.of(context);
 
     return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          12,
-          20,
-          20 + MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 42,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onSurface.withAlpha(60),
-                  borderRadius: BorderRadius.circular(999),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            12,
+            20,
+            20 + MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurface.withAlpha(60),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Filtros avanzados',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w800,
+              const SizedBox(height: 16),
+              Text(
+                'Filtros y orden',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              value: _filters.favoritesOnly,
-              onChanged: (value) {
-                setState(() {
-                  _filters = _filters.copyWith(favoritesOnly: value);
-                });
-              },
-              title: const Text('Solo favoritos'),
-            ),
-            if (!widget.isOnline) ...[
-              const SizedBox(height: 8),
-              Text('Progreso de lectura', style: theme.textTheme.labelLarge),
+              const SizedBox(height: 16),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                value: _filters.favoritesOnly,
+                onChanged: (value) {
+                  setState(() {
+                    _filters = _filters.copyWith(favoritesOnly: value);
+                  });
+                },
+                title: const Text('Solo favoritos'),
+              ),
+              if (!widget.isOnline) ...[
+                const SizedBox(height: 8),
+                Text('Progreso de lectura', style: theme.textTheme.labelLarge),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: ReadingStatusFilter.values.map((status) {
+                    final selected = _filters.readingStatus == status;
+                    return FilterChip(
+                      label: Text(status.label),
+                      selected: selected,
+                      onSelected: (_) {
+                        setState(() {
+                          _filters = _filters.copyWith(readingStatus: status);
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              ],
+              if (widget.isOnline) ...[
+                if (!widget.allowType || !widget.allowStatus)
+                  const Text('Esta fuente solo permite algunos filtros.'),
+                const SizedBox(height: 8),
+                if (widget.allowStatus)
+                  _buildChoiceChips(
+                    theme: theme,
+                    title: 'Estado',
+                    options: const ['Publicándose', 'Finalizado'],
+                    selected: _filters.status,
+                    onSelected: (value) {
+                      setState(() {
+                        _filters = _filters.copyWith(
+                          status: value,
+                          clearStatus: value == null,
+                        );
+                      });
+                    },
+                  ),
+                const SizedBox(height: 12),
+                if (widget.allowType)
+                  _buildChoiceChips(
+                    theme: theme,
+                    title: 'Tipo',
+                    options: const ['MANGA', 'MANHWA', 'MANHUA'],
+                    selected: _filters.type,
+                    onSelected: (value) {
+                      setState(() {
+                        _filters = _filters.copyWith(
+                          type: value,
+                          clearType: value == null,
+                        );
+                      });
+                    },
+                  ),
+              ],
+              const SizedBox(height: 12),
+              Text('Ordenar por', style: theme.textTheme.labelLarge),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: ReadingStatusFilter.values.map((status) {
-                  final selected = _filters.readingStatus == status;
-                  return FilterChip(
-                    label: Text(status.label),
-                    selected: selected,
-                    onSelected: (_) {
-                      setState(() {
-                        _filters = _filters.copyWith(readingStatus: status);
-                      });
-                    },
-                  );
-                }).toList(),
+                children: [
+                  _sortChip(
+                    widget.isOnline ? 'Catálogo' : 'Por defecto',
+                    MangaSortOption.catalog,
+                  ),
+                  _sortChip('Título A–Z', MangaSortOption.titleAsc),
+                  _sortChip('Título Z–A', MangaSortOption.titleDesc),
+                  _sortChip('Más capítulos', MangaSortOption.chaptersDesc),
+                  if (!widget.isOnline)
+                    _sortChip('Recientes', MangaSortOption.recentProgress),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        setState(() {
+                          _filters = MangaListFilters.empty;
+                        });
+                      },
+                      child: const Text('Limpiar'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _apply,
+                      child: const Text('Aplicar'),
+                    ),
+                  ),
+                ],
               ),
             ],
-            if (widget.isOnline) ...[
-              if (!widget.allowType || !widget.allowStatus)
-                const Text(
-                  'Esta fuente no publica todos los metadatos de filtrado.',
-                ),
-              const SizedBox(height: 8),
-              if (widget.allowStatus)
-                _buildChoiceChips(
-                  theme: theme,
-                  title: 'Estado',
-                  options: const ['Publicándose', 'Finalizado'],
-                  selected: _filters.status,
-                  onSelected: (value) {
-                    setState(() {
-                      _filters = _filters.copyWith(
-                        status: value,
-                        clearStatus: value == null,
-                      );
-                    });
-                  },
-                ),
-              const SizedBox(height: 12),
-              if (widget.allowType)
-                _buildChoiceChips(
-                  theme: theme,
-                  title: 'Tipo',
-                  options: const ['MANGA', 'MANHWA', 'MANHUA'],
-                  selected: _filters.type,
-                  onSelected: (value) {
-                    setState(() {
-                      _filters = _filters.copyWith(
-                        type: value,
-                        clearType: value == null,
-                      );
-                    });
-                  },
-                ),
-            ],
-            const SizedBox(height: 12),
-            Text('Ordenar por', style: theme.textTheme.labelLarge),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _sortChip(
-                  widget.isOnline ? 'Catálogo' : 'Por defecto',
-                  MangaSortOption.catalog,
-                ),
-                _sortChip('Titulo A-Z', MangaSortOption.titleAsc),
-                _sortChip('Titulo Z-A', MangaSortOption.titleDesc),
-                _sortChip('Mas capitulos', MangaSortOption.chaptersDesc),
-                if (!widget.isOnline)
-                  _sortChip('Recientes', MangaSortOption.recentProgress),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      setState(() {
-                        _filters = MangaListFilters.empty;
-                      });
-                    },
-                    child: const Text('Limpiar'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: _apply,
-                    child: const Text('Aplicar'),
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );

@@ -67,6 +67,39 @@ class _OnlineMangaDetailScreenState extends State<OnlineMangaDetailScreen> {
     }
   }
 
+  Future<void> _toggleChapterRead(OnlineMangaDetail detail, int index) async {
+    final chapter = detail.chapters[index];
+    final reads = context.read<ChapterReadProvider>();
+    final wasRead = reads.isRead(chapter.path);
+    await MyAnimeListService.shared
+        .registerManga(detail.toOfflineManga(), chapters: [chapter])
+        .catchError((_) {});
+    if (!mounted) return;
+    await reads.toggle(chapter.path);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            wasRead
+                ? 'Capítulo marcado como no leído'
+                : 'Capítulo marcado como leído',
+          ),
+          action: SnackBarAction(
+            label: 'Deshacer',
+            onPressed: () {
+              if (wasRead) {
+                unawaited(reads.markRead(chapter.path));
+              } else {
+                unawaited(reads.markUnread(chapter.path));
+              }
+            },
+          ),
+        ),
+      );
+  }
+
   Future<void> _loadMoreChapters(
     OnlineMangaDetail detail, {
     bool all = false,
@@ -530,8 +563,8 @@ class _OnlineMangaDetailScreenState extends State<OnlineMangaDetailScreen> {
                             : Icons.menu_book_rounded,
                         downloadLabel:
                             _selectMode && _selectedChapters.isNotEmpty
-                            ? 'Bajar (${_selectedChapters.length})'
-                            : 'Bajar',
+                            ? 'Descargar (${_selectedChapters.length})'
+                            : 'Descargar',
                       ),
                       const SizedBox(height: 18),
                       _InfoStrip(
@@ -645,7 +678,7 @@ class _OnlineMangaDetailScreenState extends State<OnlineMangaDetailScreen> {
                                   child: Text(
                                     _descriptionExpanded
                                         ? 'Ver menos'
-                                        : 'Ver mas',
+                                        : 'Ver más',
                                   ),
                                 ),
                               ),
@@ -659,7 +692,7 @@ class _OnlineMangaDetailScreenState extends State<OnlineMangaDetailScreen> {
                           Expanded(
                             child: _SectionHeader(
                               icon: Icons.format_list_numbered_rounded,
-                              title: 'Capitulos',
+                              title: 'Capítulos',
                               trailing: '${detail.chapters.length}',
                             ),
                           ),
@@ -738,7 +771,7 @@ class _OnlineMangaDetailScreenState extends State<OnlineMangaDetailScreen> {
                         ),
                       ),
                       child: Text(
-                        'No hay capitulos disponibles.',
+                        'No hay capítulos disponibles.',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurface.withAlpha(170),
                         ),
@@ -771,7 +804,7 @@ class _OnlineMangaDetailScreenState extends State<OnlineMangaDetailScreen> {
                         pageLabel:
                             _downloadStates[chapter.path] ??
                             (isCurrent && progress != null
-                                ? 'Pag. ${progress.pageIndex + 1}'
+                                ? 'Pág. ${progress.pageIndex + 1}'
                                 : null),
                         onTap: () {
                           if (_selectMode) {
@@ -786,17 +819,10 @@ class _OnlineMangaDetailScreenState extends State<OnlineMangaDetailScreen> {
                           }
                           _openReader(detail, index);
                         },
-                        onLongPress: () async {
-                          // Later pagination blocks also need the chapter index.
-                          await MyAnimeListService.shared
-                              .registerManga(
-                                detail.toOfflineManga(),
-                                chapters: [chapter],
-                              )
-                              .catchError((_) {});
-                          if (!mounted) return;
-                          await chapterRead.toggle(chapter.path);
-                        },
+                        onLongPress: () =>
+                            unawaited(_toggleChapterRead(detail, index)),
+                        onToggleRead: () =>
+                            unawaited(_toggleChapterRead(detail, index)),
                       );
                     },
                   ),
@@ -1013,7 +1039,7 @@ class _ActionRow extends StatelessWidget {
     required this.onDownload,
     required this.readLabel,
     required this.readIcon,
-    this.downloadLabel = 'Bajar',
+    this.downloadLabel = 'Descargar',
   });
 
   @override
@@ -1202,6 +1228,7 @@ class _ChapterTile extends StatelessWidget {
   final String? pageLabel;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
+  final VoidCallback? onToggleRead;
 
   const _ChapterTile({
     required this.index,
@@ -1212,6 +1239,7 @@ class _ChapterTile extends StatelessWidget {
     this.isRead = false,
     this.selected,
     this.onLongPress,
+    this.onToggleRead,
   });
 
   @override
@@ -1258,16 +1286,33 @@ class _ChapterTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  meta.isEmpty ? '${index + 1}' : meta,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: isCurrent
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurface.withAlpha(150),
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
+                Flexible(
+                  child: Text(
+                    meta.isEmpty ? '${index + 1}' : meta,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: isCurrent
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurface.withAlpha(150),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
+                if (selected == null && onToggleRead != null)
+                  PopupMenuButton<String>(
+                    tooltip: 'Opciones del capítulo',
+                    onSelected: (_) => onToggleRead!(),
+                    itemBuilder: (_) => [
+                      PopupMenuItem(
+                        value: 'read',
+                        child: Text(
+                          isRead ? 'Marcar como no leído' : 'Marcar como leído',
+                        ),
+                      ),
+                    ],
+                  ),
               ],
             ),
           ),

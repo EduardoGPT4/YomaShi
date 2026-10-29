@@ -17,24 +17,24 @@ class SourcesScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final sources = context.watch<SourceProvider>();
     final active = sources.active;
-    final activeSources = sources.sources.where((s) => s.id == active.id);
     final isMangaDex = active.id == 'mangadex';
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Fuentes'),
         actions: [
-          IconButton(
-            tooltip: 'Ahorro de datos MangaDex',
-            icon: Icon(
-              context.watch<SourceProvider>().dataSaver
-                  ? Icons.data_saver_on
-                  : Icons.data_saver_off,
+          if (isMangaDex)
+            IconButton(
+              tooltip: 'Ahorro de datos MangaDex',
+              icon: Icon(
+                context.watch<SourceProvider>().dataSaver
+                    ? Icons.data_saver_on
+                    : Icons.data_saver_off,
+              ),
+              onPressed: () => context.read<SourceProvider>().setDataSaver(
+                !context.read<SourceProvider>().dataSaver,
+              ),
             ),
-            onPressed: () => context.read<SourceProvider>().setDataSaver(
-              !context.read<SourceProvider>().dataSaver,
-            ),
-          ),
         ],
         // Se abre desde el chip de Inicio; permite volver.
         automaticallyImplyLeading: true,
@@ -44,42 +44,16 @@ class SourcesScreen extends StatelessWidget {
         children: [
           SectionHeader(
             icon: Icons.public_rounded,
-            title: 'Fuente activa',
-            trailing: active.implemented ? 'Lista' : 'Próxima',
+            title: 'Catálogo y descargas',
           ),
           const SizedBox(height: 12),
           Text(
-            'Siempre sabrás qué página se está usando para explorar y descargar.',
+            'Elige la página del catálogo. La búsqueda puede consultar varias fuentes a la vez.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurface.withAlpha(170),
               height: 1.4,
               fontWeight: FontWeight.w600,
             ),
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: activeSources
-                .map(
-                  (source) => Chip(
-                    avatar: Icon(
-                      source.icon,
-                      size: 18,
-                      color: theme.colorScheme.primary,
-                    ),
-                    label: Text(source.name),
-                    backgroundColor: theme.colorScheme.primary.withAlpha(28),
-                    side: BorderSide(
-                      color: theme.colorScheme.primary.withAlpha(80),
-                    ),
-                    labelStyle: theme.textTheme.labelLarge?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                )
-                .toList(),
           ),
           if (isMangaDex) ...[
             const SizedBox(height: HomeContentLayout.sectionSpacing),
@@ -160,26 +134,6 @@ class SourcesScreen extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Las fuentes personalizadas llegarán en una próxima versión.',
-                  ),
-                ),
-              );
-            },
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Añadir fuente personalizada'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          ),
           const SizedBox(height: 24),
           Container(
             padding: const EdgeInsets.all(16),
@@ -201,9 +155,8 @@ class SourcesScreen extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Fuentes listas: MangaDex (API), InManga, ManhwaWeb y TuMangaOnline / '
-                    'Lectortmo. En MangaDex puedes elegir Español (España) y/o '
-                    'Español (Latino).',
+                    'Puedes cambiar las fuentes de búsqueda desde Inicio. '
+                    'En MangaDex también puedes elegir el idioma y ahorrar datos.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurface.withAlpha(170),
                       height: 1.4,

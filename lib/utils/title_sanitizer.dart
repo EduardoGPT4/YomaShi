@@ -1,3 +1,5 @@
+import 'package:html/parser.dart' show parseFragment;
+
 class TitleSanitizer {
   static final List<RegExp> _metadataPatterns = <RegExp>[
     RegExp(r'\[?\s*traduccion\s*:\s*[^\]\|]+', caseSensitive: false),
@@ -21,6 +23,14 @@ class TitleSanitizer {
 
   static String clean(String title) {
     var result = title.trim();
+    // Decode source entities without treating angle brackets in a title as tags.
+    for (var pass = 0; pass < 2 && result.contains('&'); pass++) {
+      final decoded = parseFragment(
+        result.replaceAll('<', '&lt;').replaceAll('>', '&gt;'),
+      ).text;
+      if (decoded == null || decoded == result) break;
+      result = decoded;
+    }
     if (result.isEmpty) {
       return title;
     }
@@ -55,6 +65,6 @@ class TitleSanitizer {
     if (RegExp(r'^\d').hasMatch(cleaned)) {
       return 'Cap. $cleaned';
     }
-    return cleaned.isEmpty ? 'Capitulo' : cleaned;
+    return cleaned.isEmpty ? 'Capítulo' : cleaned;
   }
 }

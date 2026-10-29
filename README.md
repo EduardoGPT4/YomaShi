@@ -5,10 +5,13 @@
 Aplicación Flutter para explorar, descargar y leer manga desde InManga, MangaDex, zonatmo.org y zonatmo.to, además de una biblioteca local. Se conserva el conector adicional de ManhwaWeb que ya incluía el proyecto.
 
 - Búsqueda con selección de fuentes, resultados y paginación independientes.
+- Interfaz con contraste adaptado al acento, acciones visibles y búsqueda conservada entre pestañas.
+- Historial de descargas compacto con detalles y progreso por capítulos completos y pendientes.
 - Capítulos por bloques para series largas; continuidad y reanudación desde el lector.
 - Descargas verificadas, pausa, prioridad, reintentos limitados, concurrencia y límite de velocidad.
 - Servicio de descargas de Android independiente de la pantalla.
 - Lector RTL/LTR, doble página con portada separada, webtoon continuo y ajustes por obra.
+- Ajustes desde el lector y selector de capítulos con búsqueda y salto al actual.
 - Gestión de almacenamiento, importación CBZ/ZIP con cancelación y backups con vista previa.
 - Reparación por página y búsqueda del capítulo en otras fuentes con selección explícita.
 - Novedades de favoritos y próximos capítulos descargados según red, batería y cuota.
@@ -29,6 +32,7 @@ Documentación:
 - [Implementación de los 49 puntos del informe](IMPLEMENTACION.md)
 - [Mejoras 2.2, validación y APK personal](MEJORAS_2_2.md)
 - [MyAnimeList 2.3, sincronización y despliegue](MEJORAS_2_3.md)
+- [Interfaz 2.4, accesibilidad y comprobaciones](MEJORAS_2_4.md)
 
 ## Desarrollo
 
@@ -42,7 +46,7 @@ Entorno de validación: Flutter 3.47.5 estable, Dart 3.13.4, JDK 17. El SDK mín
 
 El APK de desarrollo se genera en build/app/outputs/flutter-apk/app-debug.apk. La validación automatizada está en .github/workflows/flutter.yml.
 
-Para uso personal, el APK ARM64 optimizado se compila con `flutter build apk --release --target-platform android-arm64 --split-per-abi --dart-define=YOMASHI_PERSONAL_RELEASE=true`. Este indicador explícito conserva el certificado de depuración existente para permitir actualizar la instalación actual. Conserva ese keystore para futuras actualizaciones. Flutter añade un desplazamiento por ABI al código de versión: el APK ARM64 de 2.3.2+6 utiliza 2006. Las siguientes actualizaciones deben usar el mismo comando y aumentar el número de compilación; evita sustituirlo por un APK universal con un código inferior.
+Para uso personal, el APK ARM64 optimizado se compila con `flutter build apk --release --target-platform android-arm64 --split-per-abi --dart-define=YOMASHI_PERSONAL_RELEASE=true`. Este indicador explícito conserva el certificado de depuración existente para permitir actualizar la instalación actual. Conserva ese keystore para futuras actualizaciones. Flutter añade un desplazamiento por ABI al código de versión: el APK ARM64 de 2.4.0+7 utiliza 2007. Las siguientes actualizaciones deben usar el mismo comando y aumentar el número de compilación; evita sustituirlo por un APK universal con un código inferior.
 
 Para otra firma, configura android/key.properties o las variables YOMASHI_KEYSTORE, YOMASHI_STORE_PASSWORD, YOMASHI_KEY_ALIAS y YOMASHI_KEY_PASSWORD. Las credenciales se excluyen del control de versiones. Sin firma ni indicador personal explícito, release falla.
 

@@ -16,7 +16,7 @@ String formatTimeAgo(int milliseconds) {
     return 'Hace ${diff.inHours} h';
   }
   if (diff.inDays < 30) {
-    return diff.inDays == 1 ? 'Hace 1 dia' : 'Hace ${diff.inDays} dias';
+    return diff.inDays == 1 ? 'Hace 1 día' : 'Hace ${diff.inDays} días';
   }
   if (diff.inDays < 365) {
     final months = (diff.inDays / 30).floor();
@@ -24,5 +24,5 @@ String formatTimeAgo(int milliseconds) {
   }
 
   final years = (diff.inDays / 365).floor();
-  return years <= 1 ? 'Hace 1 ano' : 'Hace $years anos';
+  return years <= 1 ? 'Hace 1 año' : 'Hace $years años';
 }

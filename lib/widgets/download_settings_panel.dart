@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 import '../providers/download_queue_provider.dart';
 import '../providers/library_provider.dart';
 
-/// Carpeta, WiFi, hilos y lÃ­mite de velocidad. Se muestra en Perfil.
+/// Carpeta, WiFi, hilos y límite de velocidad. Se muestra en Perfil.
 class DownloadSettingsPanel extends StatelessWidget {
   const DownloadSettingsPanel({super.key});
 
@@ -87,7 +87,7 @@ class DownloadSettingsPanel extends StatelessWidget {
               visualDensity: VisualDensity.compact,
               contentPadding: const EdgeInsets.symmetric(horizontal: 12),
               leading: const Icon(Icons.network_check_rounded, size: 20),
-              title: const Text('LÃ­mite de velocidad'),
+              title: const Text('Límite de velocidad'),
               trailing: Text(_speedLabel(provider.speedLimitKbps)),
               onTap: () =>
                   _report(context, () => _pickSpeed(context, provider)),

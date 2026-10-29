@@ -431,18 +431,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'Novedades 2.3.2',
+                  'Novedades 2.4.0',
                   style: theme.textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '• Perfil automático con tu usuario de MyAnimeList.\n'
-                  '• Vincula mangas a MyAnimeList y sincroniza tu lectura.\n'
-                  '• Reparación de descargas y capítulos en otras fuentes.\n'
-                  '• Novedades, lectura preparada y copias automáticas.\n'
-                  '• Marcadores, recorte de márgenes y orientación por manga.',
+                  '• Descargas resumidas, progreso claro y detalles desplegables.\n'
+                  '• Perfil organizado y conexión de MyAnimeList más sencilla.\n'
+                  '• Ajustes desde el lector y búsqueda de capítulos.\n'
+                  '• Mejor contraste y controles más fáciles de tocar.\n'
+                  '• La búsqueda y los filtros se conservan entre pestañas.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurface.withAlpha(170),
                     height: 1.4,
@@ -476,42 +476,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: ListView(
         padding: HomeContentLayout.paddingOf(context),
         children: [
-          ListTile(
-            leading: const Icon(Icons.sync_alt),
-            title: const Text('MyAnimeList · Manga'),
-            subtitle: Text(
-              profile.usesMyAnimeListIdentity
-                  ? 'Conectado como @${profile.myAnimeListUsername}'
-                  : 'Conectar cuenta, buscar por nombre o ID y enviar progreso',
-            ),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const MyAnimeListScreen()),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.auto_awesome),
-            title: const Text('Automatización y copias'),
-            subtitle: const Text(
-              'Novedades, lectura preparada y copias automáticas',
-            ),
-            onTap: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const AutomationScreen())),
-          ),
-          ListTile(
-            leading: const Icon(Icons.storage),
-            title: const Text('Almacenamiento'),
-            subtitle: const Text('Uso, caché y eliminación por capítulo'),
-            onTap: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const StorageScreen())),
-          ),
-          ListTile(
-            leading: const Icon(Icons.bug_report_outlined),
-            title: const Text('Exportar diagnóstico'),
-            onTap: () => unawaited(_exportDiagnostics()),
-          ),
-          // —— Identidad ——
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
@@ -567,10 +531,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               width: 2,
                             ),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.camera_alt_rounded,
                             size: 12,
-                            color: Colors.white,
+                            color: theme.colorScheme.onPrimary,
                           ),
                         ),
                       ),
@@ -634,16 +598,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 6),
-                      Text(
-                        profile.usesMyAnimeListIdentity
-                            ? 'El nombre se toma de MyAnimeList. Toca la foto para editarla.'
-                            : 'Toca la foto o el nombre para editarlos.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withAlpha(140),
-                          fontWeight: FontWeight.w600,
+                      if (!profile.usesMyAnimeListIdentity) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          'Toca la foto o el nombre para editarlos.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withAlpha(170),
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -652,15 +615,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
 
           const SizedBox(height: HomeContentLayout.sectionSpacing),
-          const SectionHeader(
-            icon: Icons.settings_rounded,
-            title: 'Configuración',
+          _SettingsCard(
+            title: 'Cuenta',
+            children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.sync_alt),
+                title: const Text('MyAnimeList · Manga'),
+                subtitle: Text(
+                  profile.usesMyAnimeListIdentity
+                      ? 'Cuenta conectada · Sincronizar lectura'
+                      : 'Conectar tu cuenta y sincronizar lectura',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const MyAnimeListScreen()),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 14),
+          const SectionHeader(icon: Icons.download_rounded, title: 'Descargas'),
+          const SizedBox(height: 10),
           const DownloadSettingsPanel(),
           const SizedBox(height: 14),
           _SettingsCard(
-            title: 'Biblioteca offline',
+            title: 'Biblioteca',
             children: [
               SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
@@ -669,52 +649,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 title: const Text('Detectar cambios automáticos'),
                 subtitle: const Text('Vigila la carpeta y actualiza la lista.'),
               ),
-              ElevatedButton.icon(
-                onPressed: () => unawaited(_pickFolder()),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.secondary,
-                  foregroundColor: theme.colorScheme.onSecondary,
-                ),
-                icon: const Icon(Icons.create_new_folder_outlined),
-                label: const Text('Agregar carpeta'),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                onTap: () => unawaited(_pickFolder()),
+                leading: const Icon(Icons.create_new_folder_outlined),
+                title: const Text('Agregar carpeta'),
+                trailing: const Icon(Icons.chevron_right),
               ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () => unawaited(_importArchive()),
-                icon: const Icon(Icons.unarchive_outlined),
-                label: const Text('Importar CBZ/ZIP'),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                onTap: () => unawaited(_importArchive()),
+                leading: const Icon(Icons.unarchive_outlined),
+                title: const Text('Importar CBZ/ZIP'),
+                trailing: const Icon(Icons.chevron_right),
               ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () {
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const HistoryScreen()),
                   );
                 },
-                icon: const Icon(Icons.history_rounded),
-                label: const Text('Historial'),
+                leading: const Icon(Icons.history_rounded),
+                title: const Text('Historial'),
+                trailing: const Icon(Icons.chevron_right),
               ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () {
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const StatsScreen()),
                   );
                 },
-                icon: const Icon(Icons.bar_chart_rounded),
-                label: const Text('Estadísticas'),
+                leading: const Icon(Icons.bar_chart_rounded),
+                title: const Text('Estadísticas'),
+                trailing: const Icon(Icons.chevron_right),
               ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () => unawaited(_exportBackup()),
-                icon: const Icon(Icons.upload_file_outlined),
-                label: const Text('Exportar backup'),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.auto_awesome),
+                title: const Text('Automatización y copias'),
+                subtitle: const Text('Novedades y lectura sin conexión'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AutomationScreen()),
+                ),
               ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () => unawaited(_importBackup()),
-                icon: const Icon(Icons.download_for_offline_outlined),
-                label: const Text('Importar backup'),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.storage),
+                title: const Text('Almacenamiento'),
+                subtitle: const Text('Espacio, caché y capítulos descargados'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const StorageScreen()),
+                ),
               ),
             ],
           ),
@@ -722,43 +711,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _SettingsCard(
             title: 'Apariencia',
             children: [
-              ListTile(
+              const ListTile(
                 dense: true,
-                visualDensity: VisualDensity.compact,
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.view_compact_alt_outlined, size: 20),
-                title: const Text('Densidad'),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: SegmentedButton<UiDensity>(
-                      showSelectedIcon: false,
-                      style: const ButtonStyle(
-                        visualDensity: VisualDensity.compact,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                leading: Icon(Icons.view_compact_alt_outlined, size: 20),
+                title: Text('Densidad'),
+              ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final option in UiDensity.values)
+                    ChoiceChip(
+                      label: Text(
+                        option == UiDensity.compact ? 'Compacta' : 'Cómoda',
                       ),
-                      segments: const [
-                        ButtonSegment(
-                          value: UiDensity.compact,
-                          label: Text('Compacta'),
-                        ),
-                        ButtonSegment(
-                          value: UiDensity.comfortable,
-                          label: Text('Cómoda'),
-                        ),
-                      ],
-                      selected: {context.watch<DensityProvider>().density},
-                      onSelectionChanged: (values) {
-                        unawaited(
-                          context.read<DensityProvider>().setDensity(
-                            values.first,
-                          ),
-                        );
-                      },
+                      selected:
+                          context.watch<DensityProvider>().density == option,
+                      onSelected: (_) => unawaited(
+                        context.read<DensityProvider>().setDensity(option),
+                      ),
                     ),
-                  ),
-                ),
+                ],
               ),
               ListTile(
                 dense: true,
@@ -776,7 +750,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
             title: 'Lector',
             children: const [ReaderSettingsPanel()],
           ),
-
+          const SizedBox(height: 14),
+          _SettingsCard(
+            title: 'Ajustes avanzados',
+            children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.upload_file_outlined),
+                title: const Text('Exportar copia de seguridad'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => unawaited(_exportBackup()),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.download_for_offline_outlined),
+                title: const Text('Importar copia de seguridad'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => unawaited(_importBackup()),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.bug_report_outlined),
+                title: const Text('Exportar diagnóstico'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => unawaited(_exportDiagnostics()),
+              ),
+            ],
+          ),
           const SizedBox(height: 24),
           InkWell(
             onTap: () => _showAboutDialog(theme),
@@ -805,7 +805,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Text('Acerca de', style: theme.textTheme.titleSmall),
                         const SizedBox(height: 2),
                         Text(
-                          'Version ${HomeContentLayout.appVersion}',
+                          'Versión ${HomeContentLayout.appVersion}',
                           style: theme.textTheme.bodySmall,
                         ),
                       ],

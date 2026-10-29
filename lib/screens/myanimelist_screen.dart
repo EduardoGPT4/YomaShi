@@ -171,6 +171,16 @@ class _MyAnimeListScreenState extends State<MyAnimeListScreen>
     });
   }
 
+  Future<void> _connect({bool restart = false}) => _run(() async {
+    final existing = restart ? null : account;
+    final session = existing?['connect_url'] is String
+        ? existing!
+        : await service.client.begin();
+    if (!mounted) return;
+    setState(() => account = session);
+    await MalPlatform.openBrowser(session['connect_url'] as String);
+  });
+
   Future<void> _select(MalManga manga) async => _run(() async {
     final detail = await service.client.detail(manga.id);
     final auth = await service.client.credentials.load();
@@ -248,13 +258,13 @@ class _MyAnimeListScreenState extends State<MyAnimeListScreen>
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Busca mangas por nombre, ID o enlace de MAL. Solo se actualizarán los capítulos leídos y el estado; la puntuación, los volúmenes y la lista de anime se conservan.',
+                    'Sincroniza tus capítulos leídos y el estado de tus mangas.',
                   ),
                   if (!connected && account != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 12),
                       child: Text(
-                        'Código: ${account!['code'] ?? ''}. Autoriza en el navegador y vuelve a YomaShi.',
+                        'Código: ${account!['code'] ?? ''}\nAutoriza en el navegador y vuelve a YomaShi. La conexión se comprobará automáticamente.',
                       ),
                     ),
                   Wrap(
@@ -262,21 +272,11 @@ class _MyAnimeListScreenState extends State<MyAnimeListScreen>
                     children: [
                       if (!connected)
                         FilledButton(
-                          onPressed: busy
-                              ? null
-                              : () => _run(() async {
-                                  final session = await service.client.begin();
-                                  if (mounted) {
-                                    setState(() => account = session);
-                                  }
-                                  await MalPlatform.openBrowser(
-                                    session['connect_url'] as String,
-                                  );
-                                }),
+                          onPressed: busy ? null : _connect,
                           child: Text(
                             account == null
                                 ? 'Conectar cuenta'
-                                : 'Iniciar otra conexión',
+                                : 'Continuar autorización',
                           ),
                         ),
                       if (connected)
@@ -284,183 +284,214 @@ class _MyAnimeListScreenState extends State<MyAnimeListScreen>
                           onPressed: busy ? null : _disconnect,
                           child: const Text('Desconectar'),
                         ),
-                      TextButton(
-                        onPressed: busy ? null : _refresh,
-                        child: const Text('Actualizar conexión'),
-                      ),
+                      if (account != null)
+                        TextButton(
+                          onPressed: busy ? null : _refresh,
+                          child: const Text('Actualizar conexión'),
+                        ),
+                      if (!connected && account != null)
+                        TextButton(
+                          onPressed: busy
+                              ? null
+                              : () => _connect(restart: true),
+                          child: const Text('Iniciar otra conexión'),
+                        ),
                     ],
                   ),
                 ],
               ),
             ),
           ),
-          if (widget.manga != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                'Obra local: ${widget.manga!.title}\n${link == null ? 'Elige un resultado y confirma el vínculo.' : 'Vínculo: ${link!['malTitle']} · ID ${link!['malId']}'}',
+          if (connected) ...[
+            const SizedBox(height: 20),
+            Text(
+              'Buscar en MyAnimeList',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            if (widget.manga != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'Obra local: ${widget.manga!.title}\n${link == null ? 'Elige un resultado y confirma el vínculo.' : 'Vínculo: ${link!['malTitle']} · ID ${link!['malId']}'}',
+                ),
               ),
-            ),
-          TextField(
-            controller: query,
-            enabled: connected && !busy,
-            decoration: const InputDecoration(
-              labelText: 'Nombre, ID o URL de manga en MyAnimeList',
-            ),
-            onSubmitted: (_) => _search(),
-          ),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: connected && !busy ? _search : null,
-            icon: const Icon(Icons.search),
-            label: const Text('Buscar manga'),
-          ),
-          for (final manga in results)
-            ListTile(
-              title: Text(manga.title),
-              subtitle: Text(
-                'MAL ${manga.id} · ${manga.totalChapters == 0 ? 'Capítulos sin confirmar' : '${manga.totalChapters} capítulos'}',
+            TextField(
+              controller: query,
+              enabled: connected && !busy,
+              decoration: const InputDecoration(
+                labelText: 'Nombre, ID o enlace de manga',
+                helperText: 'Por ejemplo: One Piece o 13',
               ),
-              selected: chosen?.id == manga.id,
-              onTap: busy ? null : () => _select(manga),
+              onSubmitted: (_) => _search(),
             ),
-          if (chosen != null)
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      chosen.title,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    Text('MyAnimeList ID ${chosen.id}'),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      initialValue: status,
-                      key: ValueKey('${chosen.id}:$status'),
-                      decoration: const InputDecoration(
-                        labelText: 'Estado de lectura',
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: connected && !busy ? _search : null,
+              icon: const Icon(Icons.search),
+              label: const Text('Buscar manga'),
+            ),
+            for (final manga in results)
+              ListTile(
+                title: Text(manga.title),
+                subtitle: Text(
+                  'MAL ${manga.id} · ${manga.totalChapters == 0 ? 'Capítulos sin confirmar' : '${manga.totalChapters} capítulos'}',
+                ),
+                selected: chosen?.id == manga.id,
+                onTap: busy ? null : () => _select(manga),
+              ),
+            if (chosen != null)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        chosen.title,
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
-                      items: states.entries
-                          .map(
-                            (e) => DropdownMenuItem(
-                              value: e.key,
-                              child: Text(e.value),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: busy
-                          ? null
-                          : (v) => setState(() => status = v!),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: chapters,
-                      enabled: !busy,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: const InputDecoration(
-                        labelText: 'Capítulos leídos',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    FilledButton(
-                      onPressed: busy
-                          ? null
-                          : () => _run(() async {
-                              final count = int.tryParse(chapters.text);
-                              if (count == null) {
-                                throw const MalFailure(
-                                  'Indica un número de capítulos válido.',
-                                );
-                              }
-                              final saved = await service.client.update(
-                                chosen.id,
-                                count,
-                                status,
-                                expectedOwner: selectedOwner,
-                              );
-                              if (mounted) {
-                                setState(() => selected = saved);
-                                ScaffoldMessenger.of(this.context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Actualizado en MyAnimeList'),
-                                  ),
-                                );
-                              }
-                            }),
-                      child: const Text('Guardar en MyAnimeList'),
-                    ),
-                    if (widget.manga != null) ...[
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text(
-                          'Enviar progreso al terminar capítulos',
+                      Text('MyAnimeList ID ${chosen.id}'),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        initialValue: status,
+                        key: ValueKey('${chosen.id}:$status'),
+                        decoration: const InputDecoration(
+                          labelText: 'Estado de lectura',
                         ),
-                        subtitle: const Text(
-                          'Conserva el mayor progreso y los estados en pausa o abandonado. Los especiales sin número confirmado no se envían.',
-                        ),
-                        value: automatic,
+                        items: states.entries
+                            .map(
+                              (e) => DropdownMenuItem(
+                                value: e.key,
+                                child: Text(e.value),
+                              ),
+                            )
+                            .toList(),
                         onChanged: busy
                             ? null
-                            : (v) => setState(() => automatic = v),
+                            : (v) => setState(() => status = v!),
                       ),
-                      FilledButton.tonal(
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: chapters,
+                        enabled: !busy,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        decoration: const InputDecoration(
+                          labelText: 'Capítulos leídos',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton(
                         onPressed: busy
                             ? null
                             : () => _run(() async {
-                                await service.link(
-                                  widget.manga!,
-                                  chosen,
-                                  automatic: automatic,
+                                final count = int.tryParse(chapters.text);
+                                if (count == null) {
+                                  throw const MalFailure(
+                                    'Indica un número de capítulos válido.',
+                                  );
+                                }
+                                final saved = await service.client.update(
+                                  chosen.id,
+                                  count,
+                                  status,
                                   expectedOwner: selectedOwner,
                                 );
-                                await _refresh();
                                 if (mounted) {
+                                  setState(() => selected = saved);
                                   ScaffoldMessenger.of(
                                     this.context,
                                   ).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Vínculo guardado'),
+                                      content: Text(
+                                        'Actualizado en MyAnimeList',
+                                      ),
                                     ),
                                   );
                                 }
                               }),
-                        child: const Text('Confirmar vínculo con esta obra'),
+                        child: const Text('Guardar en MyAnimeList'),
                       ),
+                      if (widget.manga != null) ...[
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text(
+                            'Enviar progreso al terminar capítulos',
+                          ),
+                          subtitle: const Text(
+                            'Conserva el mayor progreso y los estados en pausa o abandonado. Los especiales sin número confirmado no se envían.',
+                          ),
+                          value: automatic,
+                          onChanged: busy
+                              ? null
+                              : (v) => setState(() => automatic = v),
+                        ),
+                        FilledButton.tonal(
+                          onPressed: busy
+                              ? null
+                              : () => _run(() async {
+                                  await service.link(
+                                    widget.manga!,
+                                    chosen,
+                                    automatic: automatic,
+                                    expectedOwner: selectedOwner,
+                                  );
+                                  await _refresh();
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(
+                                      this.context,
+                                    ).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Vínculo guardado'),
+                                      ),
+                                    );
+                                  }
+                                }),
+                          child: const Text('Confirmar vínculo con esta obra'),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-          if (link != null)
-            TextButton(
-              onPressed: busy
-                  ? null
-                  : () => _run(() async {
-                      await service.unlink(widget.manga!);
-                      await _refresh();
-                    }),
-              child: const Text('Desvincular esta obra'),
-            ),
-          const SizedBox(height: 16),
-          Text('Envíos pendientes: ${pending.length}'),
-          for (final job in pending)
-            if (job['error'] is String)
-              Text('MAL ${job['malId']}: ${job['error']}'),
-          TextButton.icon(
-            onPressed: connected && !busy
-                ? () => _run(() async {
-                    await service.flush(force: true);
-                    await _refresh();
-                  })
-                : null,
-            icon: const Icon(Icons.sync),
-            label: const Text('Reintentar envíos pendientes'),
-          ),
+            if (link != null)
+              TextButton(
+                onPressed: busy
+                    ? null
+                    : () => _run(() async {
+                        await service.unlink(widget.manga!);
+                        await _refresh();
+                      }),
+                child: const Text('Desvincular esta obra'),
+              ),
+            const SizedBox(height: 16),
+            if (pending.isEmpty)
+              const ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.cloud_done_outlined),
+                title: Text('Sin envíos pendientes'),
+              ),
+            if (pending.isNotEmpty) ...[
+              Text('Envíos pendientes: ${pending.length}'),
+              for (final job in pending)
+                if (job['error'] is String)
+                  Text('MAL ${job['malId']}: ${job['error']}'),
+              TextButton.icon(
+                onPressed: connected && !busy
+                    ? () => _run(() async {
+                        await service.flush(force: true);
+                        await _refresh();
+                      })
+                    : null,
+                icon: const Icon(Icons.sync),
+                label: const Text('Reintentar envíos pendientes'),
+              ),
+            ],
+          ],
         ],
       ),
     );

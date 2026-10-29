@@ -77,6 +77,9 @@ class DownloadJob {
   /// Total de capítulos a descargar en este job (puede ser un subconjunto).
   int get totalChapters => chapterIndexesToDownload.length;
 
+  int get pendingChapters =>
+      (totalChapters - completedChapters).clamp(0, totalChapters);
+
   /// Progreso por capítulos completados (no por páginas del capítulo actual).
   double get progress {
     final total = totalChapters;
@@ -241,9 +244,12 @@ class DownloadArchiveEntry {
     this.coverUrl,
   });
 
-  String get rangeLabel => completedTitles.isEmpty
-      ? 'Sin capítulos confirmados'
-      : 'Confirmados: ${completedTitles.join(', ')}';
+  /// Resumen; la lista completa se consulta en el detalle del historial.
+  String get rangeLabel {
+    if (completedTitles.isEmpty) return 'Sin detalle de capítulos';
+    if (completedTitles.length == 1) return completedTitles.first;
+    return '${completedTitles.first} … ${completedTitles.last}';
+  }
 
   Map<String, dynamic> toMap() {
     return {

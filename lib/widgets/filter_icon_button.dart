@@ -17,10 +17,10 @@ class FilterIconButton extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        IconButton.filledTonal(
-          tooltip: 'Filtros',
+        FilledButton.tonalIcon(
           onPressed: onPressed,
           icon: const Icon(Icons.tune_rounded),
+          label: Text(active ? 'Filtros activos' : 'Filtros'),
         ),
         if (active)
           Positioned(
