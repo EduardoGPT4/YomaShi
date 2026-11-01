@@ -1,3 +1,6 @@
+import '../providers/favorites_provider.dart';
+import '../widgets/mal_sync_status.dart';
+import '../widgets/contextual_tip.dart';
 import '../data/download_storage.dart';
 import '../services/download_events.dart';
 import 'dart:async';
@@ -566,6 +569,33 @@ class _OnlineMangaDetailScreenState extends State<OnlineMangaDetailScreen> {
                             ? 'Descargar (${_selectedChapters.length})'
                             : 'Descargar',
                       ),
+                      const SizedBox(height: 12),
+                      Consumer<FavoritesProvider>(
+                        builder: (context, favorites, _) {
+                          final saved = favorites.isFavorite(detail.url);
+                          return OutlinedButton.icon(
+                            icon: Icon(
+                              saved ? Icons.favorite : Icons.favorite_border,
+                            ),
+                            label: Text(
+                              saved
+                                  ? 'Guardado en biblioteca · Favorito'
+                                  : 'Guardar en biblioteca',
+                            ),
+                            onPressed: () => favorites.toggle(
+                              key: detail.url,
+                              title: detail.title,
+                              coverPath: detail.coverUrl,
+                            ),
+                          );
+                        },
+                      ),
+                      const ContextualTip(
+                        id: 'save-manga',
+                        message:
+                            'Guardar añade el manga a tu biblioteca sin descargar capítulos. Usa Descargar cuando quieras leer sin conexión.',
+                      ),
+                      MalSyncStatus(manga: detail.toOfflineManga()),
                       const SizedBox(height: 18),
                       _InfoStrip(
                         items: [

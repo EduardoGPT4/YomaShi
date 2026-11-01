@@ -23,6 +23,14 @@ import 'package:yomashi/screens/download_queue_screen.dart';
 import 'package:yomashi/screens/myanimelist_screen.dart';
 import 'package:yomashi/screens/profile_screen.dart';
 import 'package:yomashi/screens/sources_screen.dart';
+import 'package:yomashi/screens/library_screen.dart';
+import 'package:yomashi/models/manga.dart';
+import 'package:yomashi/models/reading_progress.dart';
+import 'package:yomashi/providers/favorites_provider.dart';
+import 'package:yomashi/providers/categories_provider.dart';
+import 'package:yomashi/providers/chapter_read_provider.dart';
+import 'package:yomashi/widgets/reader_chapter_end.dart';
+import 'package:yomashi/widgets/reader_page_scrubber.dart';
 import 'package:yomashi/services/myanimelist_client.dart';
 import 'package:yomashi/services/myanimelist_service.dart';
 import 'package:yomashi/widgets/app_metrics.dart';
@@ -49,6 +57,27 @@ class _PreviewMal extends MyAnimeListClient {
 }
 
 class _PreviewLibrary extends LibraryProvider {
+  @override
+  List<Manga> get mangas => [
+    const Manga(
+      title: 'Colección descargada',
+      path: '/preview/local',
+      chapters: [
+        Chapter(title: 'Capítulo 1', path: '/preview/1', pageCount: 24),
+      ],
+    ),
+  ];
+  @override
+  List<ReadingProgress> getRecentProgress() => [
+    ReadingProgress(
+      mangaPath: '/preview/local',
+      mangaTitle: 'Colección descargada',
+      chapterPath: '/preview/1',
+      chapterTitle: 'Capítulo 1',
+      pageIndex: 8,
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+    ),
+  ];
   @override
   Future<void> flushStats() async {}
 }
@@ -112,7 +141,7 @@ void main() {
     ).readAsBytes();
     icons.addFont(Future.value(ByteData.sublistView(iconData)));
     await icons.load();
-    await Directory('build/verification/ui-2.4.0').create(recursive: true);
+    await Directory('build/verification/ui-2.5.0').create(recursive: true);
   });
   tearDownAll(() async => database.close());
 
@@ -134,6 +163,9 @@ void main() {
     final profile = ProfileProvider(malClient: client);
     final library = _PreviewLibrary();
     final density = DensityProvider();
+    final favorites = FavoritesProvider();
+    final categories = CategoriesProvider();
+    final reads = ChapterReadProvider();
     final settings = ReaderSettingsProvider();
     final source = SourceProvider();
     final accent = ThemeAccentProvider();
@@ -208,6 +240,9 @@ void main() {
         MultiProvider(
           providers: [
             ChangeNotifierProvider<ProfileProvider>.value(value: profile),
+            ChangeNotifierProvider.value(value: favorites),
+            ChangeNotifierProvider.value(value: categories),
+            ChangeNotifierProvider.value(value: reads),
             ChangeNotifierProvider<LibraryProvider>.value(value: library),
             ChangeNotifierProvider<DownloadQueueProvider>.value(value: queue),
             ChangeNotifierProvider<ReaderSettingsProvider>.value(
@@ -289,7 +324,7 @@ void main() {
       await expectLater(
         find.byKey(_previewKey),
         matchesGoldenFile(
-          File('build/verification/ui-2.4.0/$name.png').absolute.uri,
+          File('build/verification/ui-2.5.0/$name.png').absolute.uri,
         ),
       );
     }
@@ -309,6 +344,41 @@ void main() {
         navigationIndex: YomashiNavIndex.profile,
       );
       await capture('03-profile');
+      await show(
+        const ProfileScreen(settingsMode: true, initialSettingsQuery: 'brillo'),
+      );
+      await capture('07-settings-search');
+      await show(
+        const LibraryScreen(),
+        navigationIndex: YomashiNavIndex.offline,
+      );
+      await capture('08-library');
+      await show(
+        Scaffold(
+          body: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                ReaderChapterEnd(
+                  nextTitle: 'Capítulo 43 · Un nuevo comienzo',
+                  hasMore: false,
+                  offline: true,
+                  onNext: () {},
+                  onExit: () {},
+                ),
+                ReaderPageScrubber(
+                  pages: const ['', '', ''],
+                  page: 1,
+                  onCommit: (_) {},
+                  onInteraction: (_) {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await capture('09-reader-end');
 
       credentials.value = null;
       await show(MyAnimeListScreen(service: MyAnimeListService(client)));
@@ -338,6 +408,9 @@ void main() {
     } finally {
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
+      favorites.dispose();
+      categories.dispose();
+      reads.dispose();
       profile.dispose();
       library.dispose();
       queue.dispose();

@@ -236,11 +236,31 @@ void main() {
       tester.getTopLeft(find.text('MangaReader')).dy,
       lessThan(tester.getTopLeft(find.text('MyAnimeList · Manga')).dy),
     );
-    await tester.scrollUntilVisible(find.text('Densidad'), 350);
+    expect(find.text('Densidad'), findsNothing);
+    await tester.tap(find.byTooltip('Ajustes'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Buscar ajustes'),
+      'densidad',
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Densidad'));
     await tester.ensureVisible(find.text('Cómoda'));
     await tester.tap(find.text('Cómoda'));
     await tester.pumpAndSettle();
     expect(density.density, UiDensity.comfortable);
+    await tester.ensureVisible(
+      find.widgetWithText(TextFormField, 'Buscar ajustes'),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Buscar ajustes'),
+      'brillo',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Densidad'), findsNothing);
+    expect(find.text('Brillo en la app'), findsOneWidget);
+
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

@@ -5,23 +5,27 @@
 Aplicación Flutter para explorar, descargar y leer manga desde InManga, MangaDex, zonatmo.org y zonatmo.to, además de una biblioteca local. Se conserva el conector adicional de ManhwaWeb que ya incluía el proyecto.
 
 - Búsqueda con selección de fuentes, resultados y paginación independientes.
+- Biblioteca unificada: descargados, favoritos online y lecturas recientes, con búsqueda y filtros. Guardar con el corazón no descarga páginas.
+- Continuar leyendo destacado, estados en portadas y resumen de descargas desde otras pestañas.
+- Perfil separado de Ajustes, con búsqueda de configuración y consejos contextuales descartables.
 - Interfaz con contraste adaptado al acento, acciones visibles y búsqueda conservada entre pestañas.
 - Historial de descargas compacto con detalles y progreso por capítulos completos y pendientes.
 - Capítulos por bloques para series largas; continuidad y reanudación desde el lector.
 - Descargas verificadas, pausa, prioridad, reintentos limitados, concurrencia y límite de velocidad.
 - Servicio de descargas de Android independiente de la pantalla.
 - Lector RTL/LTR, doble página con portada separada, webtoon continuo y ajustes por obra.
+- Previsualización de página al arrastrar; salto al soltar, regreso tras saltos grandes y tarjeta de fin de capítulo.
 - Ajustes desde el lector y selector de capítulos con búsqueda y salto al actual.
 - Gestión de almacenamiento, importación CBZ/ZIP con cancelación y backups con vista previa.
 - Reparación por página y búsqueda del capítulo en otras fuentes con selección explícita.
 - Novedades de favoritos y próximos capítulos descargados según red, batería y cuota.
 - Marcadores, recorte opcional de márgenes y orientación por obra.
-- Copias diarias rotativas, restauración y exportación desde Perfil → Automatización y copias.
+- Copias diarias rotativas, restauración y exportación desde Perfil → Ajustes → Biblioteca → Automatización y copias.
 - MyAnimeList para manga: búsqueda por nombre, ID o URL; estado y capítulos leídos manuales o sincronización automática opcional por obra.
 
 ## MyAnimeList
 
-Desde Perfil → MyAnimeList · Manga conecta la cuenta en el navegador. Para sincronizar un manga concreto, abre su ficha o el menú del lector, busca la obra y confirma el vínculo. Activa «Enviar progreso al terminar capítulos» si quieres sincronización automática. La aplicación conserva los envíos pendientes sin conexión y permite reintentarlos; solo envía capítulos con número entero conocido y no reduce el progreso existente. Las copias guardan los vínculos, pero no las credenciales.
+Desde Perfil → MyAnimeList · Manga conecta la cuenta en el navegador. Para sincronizar un manga concreto, abre su ficha o el menú del lector, busca la obra y confirma el vínculo. Activa «Enviar progreso al terminar capítulos» si quieres sincronización automática. La aplicación conserva los envíos pendientes sin conexión y permite reintentarlos; solo envía capítulos con número entero conocido y no reduce el progreso existente. La ficha muestra la última confirmación conocida de capítulos y estado, cuándo se consultó y los envíos pendientes. «Consultar estado en MAL» consulta la cuenta sin modificar tu progreso local. Las copias guardan los vínculos, pero no las credenciales ni esta caché de estado.
 
 El perfil muestra automáticamente el nombre, `@usuario` y foto de la cuenta MAL conectada. La imagen usa la caché de la app; si no está disponible, muestra la foto local o el icono de perfil. Al desconectar se recuperan el nombre y la foto locales anteriores. Las sesiones ya conectadas reciben la imagen al actualizar su estado, sin volver a autorizar.
 
@@ -33,6 +37,7 @@ Documentación:
 - [Mejoras 2.2, validación y APK personal](MEJORAS_2_2.md)
 - [MyAnimeList 2.3, sincronización y despliegue](MEJORAS_2_3.md)
 - [Interfaz 2.4, accesibilidad y comprobaciones](MEJORAS_2_4.md)
+- [Experiencia 2.5, biblioteca unificada y controles](MEJORAS_2_5.md)
 
 ## Desarrollo
 
@@ -46,7 +51,7 @@ Entorno de validación: Flutter 3.47.5 estable, Dart 3.13.4, JDK 17. El SDK mín
 
 El APK de desarrollo se genera en build/app/outputs/flutter-apk/app-debug.apk. La validación automatizada está en .github/workflows/flutter.yml.
 
-Para uso personal, el APK ARM64 optimizado se compila con `flutter build apk --release --target-platform android-arm64 --split-per-abi --dart-define=YOMASHI_PERSONAL_RELEASE=true`. Este indicador explícito conserva el certificado de depuración existente para permitir actualizar la instalación actual. Conserva ese keystore para futuras actualizaciones. Flutter añade un desplazamiento por ABI al código de versión: el APK ARM64 de 2.4.1+8 utiliza 2008. Las siguientes actualizaciones deben usar el mismo comando y aumentar el número de compilación; evita sustituirlo por un APK universal con un código inferior.
+Para uso personal, el APK ARM64 optimizado se compila con `flutter build apk --release --target-platform android-arm64 --split-per-abi --dart-define=YOMASHI_PERSONAL_RELEASE=true`. Este indicador explícito conserva el certificado de depuración existente para permitir actualizar la instalación actual. Conserva ese keystore para futuras actualizaciones. Flutter añade un desplazamiento por ABI al código de versión: el APK ARM64 de 2.5.0+9 utiliza 2009. Las siguientes actualizaciones deben usar el mismo comando y aumentar el número de compilación; evita sustituirlo por un APK universal con un código inferior.
 
 Para otra firma, configura android/key.properties o las variables YOMASHI_KEYSTORE, YOMASHI_STORE_PASSWORD, YOMASHI_KEY_ALIAS y YOMASHI_KEY_PASSWORD. Las credenciales se excluyen del control de versiones. Sin firma ni indicador personal explícito, release falla.
 
@@ -58,7 +63,7 @@ Las tareas programadas usan WorkManager cada 12 horas; Android determina cuándo
 
 ## Compatibilidad y datos existentes
 
-Las carpetas antiguas continúan siendo legibles. Perfil → Almacenamiento permite incorporar manifiestos sin cambiar sus rutas. Los archivos cuyo origen no se puede demostrar se conservan como biblioteca local; no se adjudican automáticamente a una fuente ni se consideran descargas verificadas.
+Las carpetas antiguas continúan siendo legibles. Perfil → Ajustes → Biblioteca → Almacenamiento permite incorporar manifiestos sin cambiar sus rutas. Los archivos cuyo origen no se puede demostrar se conservan como biblioteca local; no se adjudican automáticamente a una fuente ni se consideran descargas verificadas.
 
 Las nuevas descargas usan identificadores estables y manifiestos. Cambiar la carpeta predeterminada afecta a trabajos nuevos. En Descargas puede copiarse un trabajo a otro destino: se pausa, se verifica la copia y se conserva el origen.
 

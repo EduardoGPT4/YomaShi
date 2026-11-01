@@ -89,9 +89,8 @@ ThemeData buildYomashiTheme(Color primary, AppMetrics metrics) {
     scaffoldBackgroundColor: background,
     canvasColor: surface,
     colorScheme: colorScheme,
-    visualDensity: metrics.isCompact
-        ? VisualDensity.compact
-        : VisualDensity.standard,
+    visualDensity: VisualDensity.standard,
+    materialTapTargetSize: MaterialTapTargetSize.padded,
     splashFactory: InkSparkle.splashFactory,
     appBarTheme: AppBarTheme(
       backgroundColor: Colors.transparent,
@@ -102,7 +101,7 @@ ThemeData buildYomashiTheme(Color primary, AppMetrics metrics) {
       toolbarHeight: metrics.isCompact ? 48 : 56,
       titleTextStyle: TextStyle(
         fontSize: metrics.isCompact ? 18 : 20,
-        fontWeight: FontWeight.w800,
+        fontWeight: FontWeight.w700,
         letterSpacing: -0.3,
         color: Colors.white,
       ),
@@ -110,12 +109,12 @@ ThemeData buildYomashiTheme(Color primary, AppMetrics metrics) {
     floatingActionButtonTheme: FloatingActionButtonThemeData(
       backgroundColor: colorScheme.secondary,
       foregroundColor: colorScheme.onSecondary,
-      elevation: 4,
+      elevation: 1,
     ),
     cardTheme: CardThemeData(
       color: surface,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       margin: EdgeInsets.zero,
     ),
     chipTheme: ChipThemeData(
@@ -135,7 +134,7 @@ ThemeData buildYomashiTheme(Color primary, AppMetrics metrics) {
         backgroundColor: primary,
         foregroundColor: filledForeground,
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         textStyle: const TextStyle(fontWeight: FontWeight.w700),
       ),
     ),
@@ -144,7 +143,7 @@ ThemeData buildYomashiTheme(Color primary, AppMetrics metrics) {
         backgroundColor: primary,
         foregroundColor: filledForeground,
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         textStyle: const TextStyle(fontWeight: FontWeight.w700),
       ),
     ),
@@ -158,15 +157,15 @@ ThemeData buildYomashiTheme(Color primary, AppMetrics metrics) {
       filled: true,
       fillColor: surface,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: outline),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: outline),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: colorScheme.primary),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
@@ -176,7 +175,7 @@ ThemeData buildYomashiTheme(Color primary, AppMetrics metrics) {
         foregroundColor: colorScheme.primary,
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         side: BorderSide(color: outline),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         textStyle: const TextStyle(fontWeight: FontWeight.w700),
       ),
     ),
@@ -192,7 +191,7 @@ ThemeData buildYomashiTheme(Color primary, AppMetrics metrics) {
     dialogTheme: DialogThemeData(
       backgroundColor: surface,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
     bottomSheetTheme: const BottomSheetThemeData(
       backgroundColor: surface,

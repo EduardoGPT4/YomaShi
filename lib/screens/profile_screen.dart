@@ -35,15 +35,56 @@ import 'dart:convert';
 import '../services/diagnostics.dart';
 import '../utils/app_failure.dart';
 
-/// Identidad del lector y toda la configuración de la app.
+/// Perfil personal y ajustes separados, con las mismas acciones de configuración.
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final bool settingsMode;
+  final String initialSettingsQuery;
+  const ProfileScreen({
+    super.key,
+    this.settingsMode = false,
+    this.initialSettingsQuery = '',
+  });
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  late final _settingsSearch = TextEditingController(
+    text: widget.initialSettingsQuery,
+  );
+  final _settingsScroll = ScrollController();
+  String get _settingsQuery => _settingsSearch.text;
+  @override
+  void initState() {
+    super.initState();
+    _settingsSearch.addListener(_searchSettings);
+  }
+
+  void _searchSettings() {
+    setState(() {});
+    if (_settingsScroll.hasClients) _settingsScroll.jumpTo(0);
+  }
+
+  @override
+  void dispose() {
+    _settingsSearch.removeListener(_searchSettings);
+    _settingsSearch.dispose();
+    _settingsScroll.dispose();
+    super.dispose();
+  }
+
+  bool _matches(String words) {
+    String normalize(String value) => value
+        .toLowerCase()
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('ú', 'u');
+    return normalize(words).contains(normalize(_settingsQuery.trim()));
+  }
+
   Future<void> _editDisplayName() async {
     final profile = context.read<ProfileProvider>();
     if (profile.usesMyAnimeListIdentity) {
@@ -418,7 +459,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Text(
                   'YomaShi',
                   style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -432,19 +473,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'Novedades 2.4.1',
+                  'Novedades 2.5.0',
                   style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '• Foto del perfil sincronizada con MyAnimeList.\n'
-                  '• Descargas resumidas, progreso claro y detalles desplegables.\n'
-                  '• Perfil organizado y conexión de MyAnimeList más sencilla.\n'
-                  '• Ajustes desde el lector y búsqueda de capítulos.\n'
-                  '• Mejor contraste y controles más fáciles de tocar.\n'
-                  '• La búsqueda y los filtros se conservan entre pestañas.',
+                  '• Biblioteca unificada con filtros y favoritos online.\n'
+                  '• Continuar leyendo destacado y estados en portadas.\n'
+                  '• Estado de MyAnimeList visible en cada ficha.\n'
+                  '• Previsualización de páginas y fin de capítulo.\n'
+                  '• Resumen de descargas en todas las pestañas.\n'
+                  '• Ajustes separados con búsqueda y ayuda contextual.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurface.withAlpha(170),
                     height: 1.4,
@@ -472,350 +513,446 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Perfil'),
-        automaticallyImplyLeading: false,
+        title: Text(widget.settingsMode ? 'Ajustes' : 'Perfil'),
+        automaticallyImplyLeading: widget.settingsMode,
+        actions: [
+          if (!widget.settingsMode)
+            IconButton(
+              tooltip: 'Ajustes',
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ProfileScreen(settingsMode: true),
+                ),
+              ),
+            ),
+        ],
       ),
       body: ListView(
+        controller: _settingsScroll,
         padding: HomeContentLayout.paddingOf(context),
         children: [
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: theme.colorScheme.onSurface.withAlpha(18),
+          if (widget.settingsMode) ...[
+            TextFormField(
+              controller: _settingsSearch,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
+                labelText: 'Buscar ajustes',
+                hintText: 'Brillo, copias, Wi-Fi…',
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(50),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
-                ),
-              ],
             ),
-            child: Row(
-              children: [
-                GestureDetector(
-                  onTap: profile.myAnimeListAvatarUrl != null
-                      ? null
-                      : () => unawaited(_pickAvatar()),
-                  onLongPress:
-                      profile.myAnimeListAvatarUrl == null && profile.hasAvatar
-                      ? () => unawaited(profile.clearAvatar())
-                      : null,
-                  child: Stack(
-                    children: [
-                      Tooltip(
-                        message: profile.myAnimeListAvatarUrl == null
-                            ? 'Editar foto local'
-                            : 'Foto sincronizada con MyAnimeList',
-                        child: ProfileAvatar(profile: profile),
-                      ),
-                      if (profile.myAnimeListAvatarUrl == null)
-                        Positioned(
-                          right: 0,
-                          bottom: 0,
-                          child: Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primary,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: theme.colorScheme.surface,
-                                width: 2,
-                              ),
-                            ),
-                            child: Icon(
-                              Icons.camera_alt_rounded,
-                              size: 12,
-                              color: theme.colorScheme.onPrimary,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        profile.usesMyAnimeListIdentity
-                            ? 'Nombre de MyAnimeList'
-                            : 'Nombre',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: theme.colorScheme.onSurface.withAlpha(150),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      InkWell(
-                        onTap: profile.usesMyAnimeListIdentity
-                            ? null
-                            : () => unawaited(_editDisplayName()),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                profile.displayName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.2,
-                                ),
-                              ),
-                            ),
-                            if (!profile.usesMyAnimeListIdentity) ...[
-                              const SizedBox(width: 6),
-                              Icon(
-                                Icons.edit_rounded,
-                                size: 18,
-                                color: theme.colorScheme.onSurface.withAlpha(
-                                  140,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      if (profile.usesMyAnimeListIdentity) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          '@${profile.myAnimeListUsername} · MyAnimeList',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withAlpha(170),
-                          ),
-                        ),
-                      ],
-                      if (!profile.usesMyAnimeListIdentity) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          'Toca la foto o el nombre para editarlos.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withAlpha(170),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: HomeContentLayout.sectionSpacing),
-          _SettingsCard(
-            title: 'Cuenta',
-            children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.sync_alt),
-                title: const Text('MyAnimeList · Manga'),
-                subtitle: Text(
-                  profile.usesMyAnimeListIdentity
-                      ? 'Cuenta conectada · Sincronizar lectura'
-                      : 'Conectar tu cuenta y sincronizar lectura',
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const MyAnimeListScreen()),
-                ),
+            const SizedBox(height: 16),
+            if (_settingsQuery.trim().isNotEmpty &&
+                ![
+                  'descargas wifi wi-fi hilos velocidad destino red',
+                  'biblioteca carpetas archivos importar cbz zip historial estadisticas automatizacion copias almacenamiento cache',
+                  'apariencia densidad color acento tema compacta comoda',
+                  'lector brillo imagen zoom direccion orientacion paginas controles volumen pantalla webtoon continuo doble portada margenes recortar ancho alto ajuste transicion velocidad numero toque navegacion',
+                  'avanzados exportar importar copia seguridad diagnostico',
+                  'acerca version',
+                ].any(_matches))
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('No se encontraron ajustes. Prueba otra palabra.'),
               ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          const SectionHeader(icon: Icons.download_rounded, title: 'Descargas'),
-          const SizedBox(height: 10),
-          const DownloadSettingsPanel(),
-          const SizedBox(height: 14),
-          _SettingsCard(
-            title: 'Biblioteca',
-            children: [
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                value: library.autoRescanEnabled,
-                onChanged: library.setAutoRescanEnabled,
-                title: const Text('Detectar cambios automáticos'),
-                subtitle: const Text('Vigila la carpeta y actualiza la lista.'),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                onTap: () => unawaited(_pickFolder()),
-                leading: const Icon(Icons.create_new_folder_outlined),
-                title: const Text('Agregar carpeta'),
-                trailing: const Icon(Icons.chevron_right),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                onTap: () => unawaited(_importArchive()),
-                leading: const Icon(Icons.unarchive_outlined),
-                title: const Text('Importar CBZ/ZIP'),
-                trailing: const Icon(Icons.chevron_right),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const HistoryScreen()),
-                  );
-                },
-                leading: const Icon(Icons.history_rounded),
-                title: const Text('Historial'),
-                trailing: const Icon(Icons.chevron_right),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const StatsScreen()),
-                  );
-                },
-                leading: const Icon(Icons.bar_chart_rounded),
-                title: const Text('Estadísticas'),
-                trailing: const Icon(Icons.chevron_right),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.auto_awesome),
-                title: const Text('Automatización y copias'),
-                subtitle: const Text('Novedades y lectura sin conexión'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const AutomationScreen()),
-                ),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.storage),
-                title: const Text('Almacenamiento'),
-                subtitle: const Text('Espacio, caché y capítulos descargados'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const StorageScreen()),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _SettingsCard(
-            title: 'Apariencia',
-            children: [
-              const ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.view_compact_alt_outlined, size: 20),
-                title: Text('Densidad'),
-              ),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final option in UiDensity.values)
-                    ChoiceChip(
-                      label: Text(
-                        option == UiDensity.compact ? 'Compacta' : 'Cómoda',
-                      ),
-                      selected:
-                          context.watch<DensityProvider>().density == option,
-                      onSelected: (_) => unawaited(
-                        context.read<DensityProvider>().setDensity(option),
-                      ),
-                    ),
-                ],
-              ),
-              ListTile(
-                dense: true,
-                visualDensity: VisualDensity.compact,
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.palette_outlined, size: 20),
-                title: const Text('Color de acento'),
-                trailing: const Icon(Icons.chevron_right, size: 18),
-                onTap: () => unawaited(_pickThemeAccent()),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _SettingsCard(
-            title: 'Lector',
-            children: const [ReaderSettingsPanel()],
-          ),
-          const SizedBox(height: 14),
-          _SettingsCard(
-            title: 'Ajustes avanzados',
-            children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.upload_file_outlined),
-                title: const Text('Exportar copia de seguridad'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => unawaited(_exportBackup()),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.download_for_offline_outlined),
-                title: const Text('Importar copia de seguridad'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => unawaited(_importBackup()),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.bug_report_outlined),
-                title: const Text('Exportar diagnóstico'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => unawaited(_exportDiagnostics()),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          InkWell(
-            onTap: () => _showAboutDialog(theme),
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          ],
+          if (!widget.settingsMode)
+            Container(
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(18),
                 border: Border.all(
-                  color: theme.colorScheme.onSurface.withAlpha(20),
+                  color: theme.colorScheme.onSurface.withAlpha(18),
                 ),
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 18,
-                    color: theme.colorScheme.primary,
+                  GestureDetector(
+                    onTap: profile.myAnimeListAvatarUrl != null
+                        ? null
+                        : () => unawaited(_pickAvatar()),
+                    onLongPress:
+                        profile.myAnimeListAvatarUrl == null &&
+                            profile.hasAvatar
+                        ? () => unawaited(profile.clearAvatar())
+                        : null,
+                    child: Stack(
+                      children: [
+                        Tooltip(
+                          message: profile.myAnimeListAvatarUrl == null
+                              ? 'Editar foto local'
+                              : 'Foto sincronizada con MyAnimeList',
+                          child: ProfileAvatar(profile: profile),
+                        ),
+                        if (profile.myAnimeListAvatarUrl == null)
+                          Positioned(
+                            right: 0,
+                            bottom: 0,
+                            child: Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: theme.colorScheme.surface,
+                                  width: 2,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.camera_alt_rounded,
+                                size: 12,
+                                color: theme.colorScheme.onPrimary,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Acerca de', style: theme.textTheme.titleSmall),
-                        const SizedBox(height: 2),
                         Text(
-                          'Versión ${HomeContentLayout.appVersion}',
-                          style: theme.textTheme.bodySmall,
+                          profile.usesMyAnimeListIdentity
+                              ? 'Nombre de MyAnimeList'
+                              : 'Nombre',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: theme.colorScheme.onSurface.withAlpha(150),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
+                        const SizedBox(height: 4),
+                        InkWell(
+                          onTap: profile.usesMyAnimeListIdentity
+                              ? null
+                              : () => unawaited(_editDisplayName()),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  profile.displayName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                              ),
+                              if (!profile.usesMyAnimeListIdentity) ...[
+                                const SizedBox(width: 6),
+                                Icon(
+                                  Icons.edit_rounded,
+                                  size: 18,
+                                  color: theme.colorScheme.onSurface.withAlpha(
+                                    140,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        if (profile.usesMyAnimeListIdentity) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            '@${profile.myAnimeListUsername} · MyAnimeList',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface.withAlpha(170),
+                            ),
+                          ),
+                        ],
+                        if (!profile.usesMyAnimeListIdentity) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'Toca la foto o el nombre para editarlos.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface.withAlpha(170),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
-                  ),
-                  Icon(
-                    Icons.chevron_right,
-                    size: 18,
-                    color: theme.colorScheme.onSurface.withAlpha(128),
                   ),
                 ],
               ),
             ),
-          ),
+
+          if (!widget.settingsMode)
+            const SizedBox(height: HomeContentLayout.sectionSpacing),
+          if (!widget.settingsMode)
+            _SettingsCard(
+              title: 'Cuenta',
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.sync_alt),
+                  title: const Text('MyAnimeList · Manga'),
+                  subtitle: Text(
+                    profile.usesMyAnimeListIdentity
+                        ? 'Cuenta conectada · Sincronizar lectura'
+                        : 'Conectar tu cuenta y sincronizar lectura',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const MyAnimeListScreen(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          if (!widget.settingsMode) ...[
+            _SettingsCard(
+              title: 'Tu lectura',
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.auto_stories_outlined),
+                  title: Text(
+                    '${library.readingStats.uniqueMangasOpened} mangas · ${library.readingStats.pagesRead} páginas leídas',
+                  ),
+                  subtitle: const Text('Ver estadísticas de lectura'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const StatsScreen()),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.history),
+                  title: const Text('Historial de lectura'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                  ),
+                ),
+              ],
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings_outlined),
+              title: const Text('Ajustes de YomaShi'),
+              subtitle: const Text('Lector, descargas, apariencia y copias'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ProfileScreen(settingsMode: true),
+                ),
+              ),
+            ),
+          ],
+          if (widget.settingsMode &&
+              _matches('descargas wifi wi-fi hilos velocidad destino red')) ...[
+            const SectionHeader(
+              icon: Icons.download_rounded,
+              title: 'Descargas',
+            ),
+            const SizedBox(height: 10),
+            const DownloadSettingsPanel(),
+          ],
+          if (widget.settingsMode &&
+              _matches(
+                'biblioteca carpetas archivos importar cbz zip historial estadisticas automatizacion copias almacenamiento cache',
+              ))
+            _SettingsCard(
+              title: 'Biblioteca',
+              children: [
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  value: library.autoRescanEnabled,
+                  onChanged: library.setAutoRescanEnabled,
+                  title: const Text('Detectar cambios automáticos'),
+                  subtitle: const Text(
+                    'Vigila la carpeta y actualiza la lista.',
+                  ),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  onTap: () => unawaited(_pickFolder()),
+                  leading: const Icon(Icons.create_new_folder_outlined),
+                  title: const Text('Agregar carpeta'),
+                  trailing: const Icon(Icons.chevron_right),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  onTap: () => unawaited(_importArchive()),
+                  leading: const Icon(Icons.unarchive_outlined),
+                  title: const Text('Importar CBZ/ZIP'),
+                  trailing: const Icon(Icons.chevron_right),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                    );
+                  },
+                  leading: const Icon(Icons.history_rounded),
+                  title: const Text('Historial'),
+                  trailing: const Icon(Icons.chevron_right),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const StatsScreen()),
+                    );
+                  },
+                  leading: const Icon(Icons.bar_chart_rounded),
+                  title: const Text('Estadísticas'),
+                  trailing: const Icon(Icons.chevron_right),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.auto_awesome),
+                  title: const Text('Automatización y copias'),
+                  subtitle: const Text('Novedades y lectura sin conexión'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const AutomationScreen()),
+                  ),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.storage),
+                  title: const Text('Almacenamiento'),
+                  subtitle: const Text(
+                    'Espacio, caché y capítulos descargados',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const StorageScreen()),
+                  ),
+                ),
+              ],
+            ),
+          if (widget.settingsMode &&
+              _matches('apariencia densidad color acento tema compacta comoda'))
+            _SettingsCard(
+              title: 'Apariencia',
+              children: [
+                const ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.view_compact_alt_outlined, size: 20),
+                  title: Text('Densidad'),
+                ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final option in UiDensity.values)
+                      ChoiceChip(
+                        label: Text(
+                          option == UiDensity.compact ? 'Compacta' : 'Cómoda',
+                        ),
+                        selected:
+                            context.watch<DensityProvider>().density == option,
+                        onSelected: (_) => unawaited(
+                          context.read<DensityProvider>().setDensity(option),
+                        ),
+                      ),
+                  ],
+                ),
+                ListTile(
+                  dense: true,
+                  visualDensity: VisualDensity.compact,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.palette_outlined, size: 20),
+                  title: const Text('Color de acento'),
+                  trailing: const Icon(Icons.chevron_right, size: 18),
+                  onTap: () => unawaited(_pickThemeAccent()),
+                ),
+              ],
+            ),
+          if (widget.settingsMode &&
+              _matches(
+                'lector brillo imagen zoom direccion orientacion paginas controles volumen pantalla webtoon continuo doble portada margenes recortar ancho alto ajuste transicion velocidad numero toque navegacion',
+              ))
+            _SettingsCard(
+              title: 'Lector',
+              children: const [ReaderSettingsPanel()],
+            ),
+          if (widget.settingsMode &&
+              _matches(
+                'avanzados exportar importar copia seguridad diagnostico',
+              ))
+            _SettingsCard(
+              title: 'Ajustes avanzados',
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.upload_file_outlined),
+                  title: const Text('Exportar copia de seguridad'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => unawaited(_exportBackup()),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.download_for_offline_outlined),
+                  title: const Text('Importar copia de seguridad'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => unawaited(_importBackup()),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.bug_report_outlined),
+                  title: const Text('Exportar diagnóstico'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => unawaited(_exportDiagnostics()),
+                ),
+              ],
+            ),
+          const SizedBox(height: 24),
+          if (!widget.settingsMode || _matches('acerca version'))
+            InkWell(
+              onTap: () => _showAboutDialog(theme),
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: theme.colorScheme.onSurface.withAlpha(20),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Acerca de', style: theme.textTheme.titleSmall),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Versión ${HomeContentLayout.appVersion}',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 18,
+                      color: theme.colorScheme.onSurface.withAlpha(128),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           const SizedBox(height: 28),
         ],
       ),
@@ -832,31 +969,34 @@ class _SettingsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Material(
-      color: theme.colorScheme.surface,
-      elevation: 1,
-      shadowColor: Colors.black.withAlpha(80),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: theme.colorScheme.onSurface.withAlpha(18)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              title.toUpperCase(),
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: theme.colorScheme.onSurface.withAlpha(170),
-                letterSpacing: 0.6,
-                fontWeight: FontWeight.w800,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Material(
+        color: theme.colorScheme.surface,
+        elevation: 0,
+        shadowColor: Colors.black.withAlpha(80),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(color: theme.colorScheme.onSurface.withAlpha(18)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.onSurface.withAlpha(170),
+                  letterSpacing: 0,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            ...children,
-          ],
+              const SizedBox(height: 12),
+              ...children,
+            ],
+          ),
         ),
       ),
     );

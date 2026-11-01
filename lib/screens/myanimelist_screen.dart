@@ -10,6 +10,14 @@ class MyAnimeListScreen extends StatefulWidget {
   final Manga? manga;
   final MyAnimeListService? service;
   const MyAnimeListScreen({super.key, this.manga, this.service});
+  static String statesLabel(String? value) => switch (value) {
+    'reading' => 'Leyendo',
+    'completed' => 'Completado',
+    'on_hold' => 'En pausa',
+    'dropped' => 'Abandonado',
+    'plan_to_read' => 'Por leer',
+    _ => 'Sin estado',
+  };
   @override
   State<MyAnimeListScreen> createState() => _MyAnimeListScreenState();
 }
@@ -91,7 +99,7 @@ class _MyAnimeListScreenState extends State<MyAnimeListScreen>
           }
           account = next;
           link = mapping;
-          pending = jobs;
+          pending = jobs.where((j) => j['owner'] == after).toList();
           automatic = mapping?['automatic'] == true;
           if (next?['connected'] == true) error = null;
         });
@@ -316,6 +324,23 @@ class _MyAnimeListScreenState extends State<MyAnimeListScreen>
                   'Obra local: ${widget.manga!.title}\n${link == null ? 'Elige un resultado y confirma el vínculo.' : 'Vínculo: ${link!['malTitle']} · ID ${link!['malId']}'}',
                 ),
               ),
+            if (link != null)
+              TextButton.icon(
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Revisar progreso de la obra vinculada'),
+                onPressed: busy
+                    ? null
+                    : () => _select(
+                        MalManga(
+                          id: link!['malId'] as int,
+                          title: link!['malTitle'] as String,
+                          chaptersRead: 0,
+                          totalChapters: 0,
+                          status: 'reading',
+                          publishingStatus: '',
+                        ),
+                      ),
+              ),
             TextField(
               controller: query,
               enabled: connected && !busy,
@@ -401,6 +426,14 @@ class _MyAnimeListScreenState extends State<MyAnimeListScreen>
                                   status,
                                   expectedOwner: selectedOwner,
                                 );
+                                if (widget.manga != null) {
+                                  await service.recordSnapshot(
+                                    widget.manga!,
+                                    saved,
+                                    sent: true,
+                                    expectedOwner: selectedOwner,
+                                  );
+                                }
                                 if (mounted) {
                                   setState(() => selected = saved);
                                   ScaffoldMessenger.of(

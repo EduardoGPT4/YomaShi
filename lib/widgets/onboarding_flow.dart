@@ -32,29 +32,16 @@ class _OnboardingDialogState extends State<_OnboardingDialog> {
 
   static const _pages = <_OnboardingPageData>[
     _OnboardingPageData(
-      icon: Icons.folder_open_rounded,
-      title: 'Biblioteca offline',
+      icon: Icons.auto_stories_outlined,
+      title: 'Tu próxima lectura',
       body:
-          'Al iniciar, YomaShi crea la carpeta YomaShi en la raíz del teléfono '
-          '(/storage/emulated/0/YomaShi). Formato: Manga/Nombre/Capitulo 001/001.jpg',
+          'Busca un manga en Inicio, guárdalo con el corazón y continúa desde Biblioteca. Puedes leer online o descargar para después.',
     ),
     _OnboardingPageData(
-      icon: Icons.public_rounded,
-      title: 'Fuentes y online',
+      icon: Icons.help_outline,
+      title: 'A tu ritmo',
       body:
-          'Elige la fuente en Fuentes, explora en Online y descarga mangas a la carpeta Manga/.',
-    ),
-    _OnboardingPageData(
-      icon: Icons.favorite_rounded,
-      title: 'Favoritos y categorías',
-      body:
-          'Marca mangas con el corazón. Mantén presionado para asignar categorías personalizadas.',
-    ),
-    _OnboardingPageData(
-      icon: Icons.download_rounded,
-      title: 'Descargas y offline',
-      body:
-          'La pestaña Descargas muestra la cola. Offline reúne solo lo local y descargado.',
+          'Encontrarás consejos al usar cada apartado. Los ajustes del lector están dentro del capítulo y puedes conectar MyAnimeList desde Perfil.',
     ),
   ];
 
@@ -91,7 +78,7 @@ class _OnboardingDialogState extends State<_OnboardingDialog> {
       contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
       content: SizedBox(
         width: 360,
-        height: 320,
+        height: MediaQuery.sizeOf(context).height.clamp(240.0, 520.0) * .6,
         child: Column(
           children: [
             Expanded(
@@ -101,32 +88,34 @@ class _OnboardingDialogState extends State<_OnboardingDialog> {
                 onPageChanged: (index) => setState(() => _page = index),
                 itemBuilder: (context, index) {
                   final page = _pages[index];
-                  return Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        page.icon,
-                        size: 48,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(height: 18),
-                      Text(
-                        page.title,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
+                  return SingleChildScrollView(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          page.icon,
+                          size: 48,
+                          color: theme.colorScheme.primary,
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        page.body,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          height: 1.45,
-                          color: theme.colorScheme.onSurface.withAlpha(190),
+                        const SizedBox(height: 18),
+                        Text(
+                          page.title,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                        Text(
+                          page.body,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            height: 1.45,
+                            color: theme.colorScheme.onSurface.withAlpha(190),
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 },
               ),

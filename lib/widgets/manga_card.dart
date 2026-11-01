@@ -74,6 +74,7 @@ class MangaCard extends StatefulWidget {
   final VoidCallback? onLongPress;
   final Duration longPressDuration;
   final String? badge;
+  final IconData? badgeIcon;
   final bool isFavorite;
   final VoidCallback? onFavoriteToggle;
 
@@ -88,6 +89,7 @@ class MangaCard extends StatefulWidget {
     this.onLongPress,
     this.longPressDuration = const Duration(milliseconds: 800),
     this.badge,
+    this.badgeIcon,
     this.isFavorite = false,
     this.onFavoriteToggle,
     this.progress,
@@ -267,14 +269,35 @@ class _MangaCardState extends State<MangaCard> {
                                 color: theme.colorScheme.primary.withAlpha(230),
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: Text(
-                                widget.badge!,
-                                style: TextStyle(
-                                  color: theme.colorScheme.onPrimary,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 9,
-                                  height: 1.2,
-                                ),
+                              constraints: BoxConstraints(
+                                maxWidth:
+                                    MediaQuery.sizeOf(context).width / 3 - 18,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (widget.badgeIcon != null) ...[
+                                    Icon(
+                                      widget.badgeIcon,
+                                      size: 12,
+                                      color: theme.colorScheme.onPrimary,
+                                    ),
+                                    const SizedBox(width: 3),
+                                  ],
+                                  Flexible(
+                                    child: Text(
+                                      widget.badge!,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: theme.colorScheme.onPrimary,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 10,
+                                        height: 1.2,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),

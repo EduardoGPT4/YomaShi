@@ -695,7 +695,7 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
     final entries = <ContinueReadingEntry>[];
     for (final progress in items) {
       String? coverPath = progress.coverPath;
-      var progressValue = 0.35;
+      var progressValue = 0.0;
 
       if (coverPath == null || coverPath.isEmpty) {
         try {

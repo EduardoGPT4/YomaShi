@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import '../widgets/bottom_nav_bar.dart';
 import 'download_queue_screen.dart';
 import 'home_screen.dart';
-import 'offline_library_screen.dart';
+import 'library_screen.dart';
+import '../widgets/download_activity.dart';
 import 'profile_screen.dart';
 
-/// Shell principal: Inicio · Offline · Descargas · Perfil.
+/// Shell principal: Inicio · Biblioteca · Descargas · Perfil.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -31,7 +32,7 @@ class _MainShellState extends State<MainShell> {
               enabled: index == _index,
               child: switch (index) {
                 YomashiNavIndex.home => const HomeScreen(),
-                YomashiNavIndex.offline => const OfflineLibraryScreen(),
+                YomashiNavIndex.offline => const LibraryScreen(),
                 YomashiNavIndex.downloads => const DownloadQueueScreen(),
                 _ => const ProfileScreen(),
               },
@@ -39,18 +40,24 @@ class _MainShellState extends State<MainShell> {
           );
         }),
       ),
-      bottomNavigationBar: YomashiBottomNavBar(
-        currentIndex: _index,
-        onTap: (value) {
-          if (value == _index) {
-            return;
-          }
-          FocusScope.of(context).unfocus();
-          setState(() {
-            _visited.add(value);
-            _index = value;
-          });
-        },
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_index != YomashiNavIndex.downloads) const DownloadActivity(),
+          YomashiBottomNavBar(
+            currentIndex: _index,
+            onTap: (value) {
+              if (value == _index) {
+                return;
+              }
+              FocusScope.of(context).unfocus();
+              setState(() {
+                _visited.add(value);
+                _index = value;
+              });
+            },
+          ),
+        ],
       ),
     );
   }

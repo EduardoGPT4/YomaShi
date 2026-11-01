@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import '../data/library_store.dart';
 import '../models/chapter.dart';
 import '../models/content_identity.dart';
@@ -10,6 +11,7 @@ import 'myanimelist_client.dart';
 class MyAnimeListService {
   static final shared = MyAnimeListService(MyAnimeListClient());
   final MyAnimeListClient client;
+  final changes = ValueNotifier<int>(0);
   Future<void>? _flushing;
   MyAnimeListService(this.client);
   static String mangaKey(Manga m) =>
@@ -40,6 +42,94 @@ class MyAnimeListService {
       mangaKey(manga),
     );
     return value is Map ? Map<String, dynamic>.from(value) : null;
+  }
+
+  Future<Map<String, dynamic>> statusFor(Manga manga) async {
+    final auth = await client.credentials.load();
+    final owner = (auth?['profile'] as Map?)?['id'];
+    final mapping = await linkFor(manga);
+    if (auth?['connected'] != true ||
+        mapping == null ||
+        mapping['owner'] != owner) {
+      return {'connected': auth?['connected'] == true};
+    }
+    final store = await LibraryStore.ensureInitialized();
+    final snapshot = await store.getRecord('mal_sync', mangaKey(manga));
+    final pending = await store.getRecord('mal_pending', mangaKey(manga));
+    bool current(dynamic row) =>
+        row is Map &&
+        row['owner'] == owner &&
+        row['version'] == mapping['version'];
+    return {
+      'connected': true,
+      'link': mapping,
+      if (current(snapshot)) 'snapshot': snapshot,
+      if (current(pending)) 'pending': pending,
+    };
+  }
+
+  Future<void> recordSnapshot(
+    Manga manga,
+    MalManga value, {
+    bool sent = false,
+    int? expectedOwner,
+    String? expectedToken,
+    int? expectedVersion,
+  }) async {
+    final auth = await client.credentials.load();
+    final owner = (auth?['profile'] as Map?)?['id'];
+    if (auth?['connected'] != true ||
+        owner is! int ||
+        (expectedOwner != null && owner != expectedOwner) ||
+        (expectedToken != null && auth?['device_token'] != expectedToken)) {
+      return;
+    }
+    final store = await LibraryStore.ensureInitialized();
+    final key = mangaKey(manga);
+    await store.transaction(() async {
+      final link = await store.getRecord('mal_links', key);
+      if (link is! Map ||
+          link['owner'] != owner ||
+          link['malId'] != value.id ||
+          (expectedVersion != null && link['version'] != expectedVersion)) {
+        return;
+      }
+      final previous = await store.getRecord('mal_sync', key);
+      final now = DateTime.now().millisecondsSinceEpoch;
+      await store.putRecord('mal_sync', key, {
+        'id': key,
+        'owner': owner,
+        'version': link['version'],
+        'chapters': value.chaptersRead,
+        'status': value.status,
+        'checkedAt': now,
+        if (sent) ...{
+          'syncedAt': now,
+          'sentChapters': value.chaptersRead,
+        } else if (previous is Map &&
+            previous['version'] == link['version'] &&
+            previous['owner'] == owner) ...{
+          'syncedAt': previous['syncedAt'],
+          'sentChapters': previous['sentChapters'],
+        },
+      });
+    });
+    changes.value++;
+  }
+
+  Future<void> refreshManga(Manga manga) async {
+    final state = await statusFor(manga);
+    final link = state['link'];
+    if (link is! Map) return;
+    final session = await client.credentials.load();
+    final value = await client.detail(link['malId'] as int);
+    await recordSnapshot(
+      manga,
+      value,
+      expectedOwner: link['owner'] as int,
+      expectedVersion: link['version'] as int,
+      expectedToken: session?['device_token'] as String?,
+    );
   }
 
   Future<void> link(
@@ -75,6 +165,8 @@ class MyAnimeListService {
       });
     });
     await registerManga(manga);
+    await recordSnapshot(manga, selected, expectedOwner: owner);
+    changes.value++;
     if (automatic) {
       final reads = await PreferencesService.getReadChapterKeys();
       Chapter? latest;
@@ -98,7 +190,9 @@ class MyAnimeListService {
     await store.transaction(() async {
       await store.deleteRecord('mal_links', key);
       await store.deleteRecord('mal_pending', key);
+      await store.deleteRecord('mal_sync', key);
     });
+    changes.value++;
   }
 
   Future<void> registerManga(Manga manga, {Iterable<Chapter>? chapters}) async {
@@ -171,13 +265,17 @@ class MyAnimeListService {
         'retryAt': 0,
       });
     });
+    changes.value++;
   }
 
   Future<void> flush({bool force = false}) {
     if (_flushing != null) return _flushing!;
     final work = _flush(force: force);
     _flushing = work;
-    return work.whenComplete(() => _flushing = null);
+    return work.whenComplete(() {
+      _flushing = null;
+      changes.value++;
+    });
   }
 
   Future<void> _flush({required bool force}) async {
@@ -228,13 +326,31 @@ class MyAnimeListService {
               session?['connected'] != true) {
             return;
           }
-          await client.update(
+          final result = await client.update(
             job!['malId'] as int,
             job!['chapters'] as int,
             'reading',
             automatic: true,
             expectedOwner: owner,
           );
+          final mapping = await store.getRecord(
+            'mal_links',
+            record['id'] as String,
+          );
+          if (mapping is Map && mapping['version'] == job!['version']) {
+            await recordSnapshot(
+              Manga(
+                title: mapping['title'] as String? ?? '',
+                path: record['id'] as String,
+                chapters: const [],
+              ),
+              result,
+              sent: true,
+              expectedOwner: owner,
+              expectedVersion: job!['version'] as int,
+              expectedToken: session?['device_token'] as String?,
+            );
+          }
           await store.transaction(() async {
             final current = await store.getRecord(
               'mal_pending',

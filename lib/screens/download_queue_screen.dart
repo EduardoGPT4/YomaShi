@@ -1,3 +1,4 @@
+import '../widgets/contextual_tip.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -38,6 +39,11 @@ class DownloadQueueScreen extends StatelessWidget {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      const ContextualTip(
+                        id: 'downloads',
+                        message:
+                            'Pausa y reanuda sin perder páginas. El resumen inferior controla las descargas desde otras pestañas.',
+                      ),
                       if (provider.persistenceError != null)
                         Text(provider.persistenceError!),
                       SectionHeader(

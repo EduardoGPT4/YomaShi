@@ -163,7 +163,7 @@ class _OfflineLibraryScreenState extends State<OfflineLibraryScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Offline'),
+            title: const Text('Archivos descargados'),
             automaticallyImplyLeading: false,
             actions: [
               IconButton(

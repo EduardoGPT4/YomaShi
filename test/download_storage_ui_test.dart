@@ -38,7 +38,9 @@ class _LibraryFixture extends LibraryProvider {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(
+    () => SharedPreferences.setMockInitialValues({'tip_downloads_v1': true}),
+  );
 
   Future<void> showScreen(
     WidgetTester tester,
@@ -106,6 +108,8 @@ void main() {
           tester.getTopLeft(find.text('Manga de prueba')).dy,
       lessThan(500),
     );
+    await tester.ensureVisible(find.text('Ver detalles'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Ver detalles'));
     await tester.pumpAndSettle();
     expect(find.text('Capítulo 1'), findsOneWidget);
@@ -160,6 +164,7 @@ void main() {
     expect(find.text('Priorizar'), findsNothing);
     expect(find.byTooltip('Subir en la cola'), findsNothing);
     await tester.ensureVisible(find.text('Reintentar pendientes'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Reintentar pendientes'));
     expect(queue.resumed, 'failed');
     expect(tester.takeException(), isNull);

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/download_queue_provider.dart';
 
 import 'app_metrics.dart';
 
@@ -10,7 +12,7 @@ abstract final class YomashiNavIndex {
   static const int profile = 3;
 }
 
-/// Bottom navigation: Inicio · Offline · Descargas · Perfil.
+/// Bottom navigation: Inicio · Biblioteca · Descargas · Perfil.
 class YomashiBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -26,18 +28,23 @@ class YomashiBottomNavBar extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final metrics = AppMetrics.of(context);
+    final jobs =
+        context.watch<DownloadQueueProvider?>()?.jobs ?? <DownloadJob>[];
+    final count = jobs
+        .where(
+          (j) => {
+            DownloadJobStatus.downloading,
+            DownloadJobStatus.queued,
+            DownloadJobStatus.paused,
+            DownloadJobStatus.failed,
+          }.contains(j.status),
+        )
+        .length;
 
     return Container(
       decoration: BoxDecoration(
         color: scheme.surface,
         border: Border(top: BorderSide(color: scheme.onSurface.withAlpha(22))),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(80),
-            blurRadius: 18,
-            offset: const Offset(0, -4),
-          ),
-        ],
       ),
       child: SafeArea(
         top: false,
@@ -50,23 +57,31 @@ class YomashiBottomNavBar extends StatelessWidget {
           selectedIndex: currentIndex,
           onDestinationSelected: onTap,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          destinations: const [
-            NavigationDestination(
+          destinations: [
+            const NavigationDestination(
               icon: Icon(Icons.home_outlined),
               selectedIcon: Icon(Icons.home_rounded),
               label: 'Inicio',
             ),
-            NavigationDestination(
+            const NavigationDestination(
               icon: Icon(Icons.download_done_outlined),
               selectedIcon: Icon(Icons.download_done_rounded),
-              label: 'Offline',
+              label: 'Biblioteca',
             ),
             NavigationDestination(
-              icon: Icon(Icons.download_outlined),
-              selectedIcon: Icon(Icons.download_rounded),
+              icon: Badge.count(
+                count: count,
+                isLabelVisible: count > 0,
+                child: const Icon(Icons.download_outlined),
+              ),
+              selectedIcon: Badge.count(
+                count: count,
+                isLabelVisible: count > 0,
+                child: const Icon(Icons.download_rounded),
+              ),
               label: 'Descargas',
             ),
-            NavigationDestination(
+            const NavigationDestination(
               icon: Icon(Icons.person_outline_rounded),
               selectedIcon: Icon(Icons.person_rounded),
               label: 'Perfil',

@@ -1,3 +1,6 @@
+import '../widgets/reader_page_scrubber.dart';
+import '../widgets/reader_chapter_end.dart';
+import '../widgets/contextual_tip.dart';
 import '../models/content_identity.dart';
 import '../utils/app_failure.dart';
 import '../services/source_http_client.dart';
@@ -228,7 +231,9 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   void _scheduleControlsHide() {
     _controlsHideTimer?.cancel();
-    if (!_showControls || _readerPanelOpen) {
+    if (!_showControls ||
+        _readerPanelOpen ||
+        (_pages.isNotEmpty && _pageIndex >= _pages.length - 1)) {
       return;
     }
     _controlsHideTimer = Timer(const Duration(seconds: 4), () {
@@ -257,6 +262,7 @@ class _ReaderScreenState extends State<ReaderScreen>
     final cancellation = CancellationToken();
     _chapterCancellation = cancellation;
     final gen = ++_chapterOpenGen;
+    if (gen > 1) ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
     final safeIndex = _safeChapterIndex(index);
     final chapter = _chapters.isEmpty ? null : _chapters[safeIndex];
     if (chapter == null) {
@@ -527,26 +533,43 @@ class _ReaderScreenState extends State<ReaderScreen>
       return;
     }
     final target = (result - 1).clamp(0, pages.length - 1);
-    if (context.read<ReaderSettingsProvider>().continuousVertical) {
-      setState(() {
-        _pageIndex = target;
-        _webtoonAnchor = target;
-        _imageRevision++;
-      });
-      _saveProgress();
-      return;
-    }
+    _commitPageJump(target);
+  }
+
+  void _commitPageJump(int target) {
+    if (_loadingChapter || _pages.isEmpty) return;
+    final before = _pageIndex, chapter = _currentChapter?.path;
     final settings = context.read<ReaderSettingsProvider>();
-    final viewerIndex = _viewerIndexForPage(target, settings);
-    setState(() => _pageIndex = target);
-    if (_pageController.hasClients) {
-      await _pageController.animateToPage(
-        viewerIndex,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic,
+    final safe = target.clamp(0, _pages.length - 1);
+    _controlsHideTimer?.cancel();
+    setState(() => _showControls = true);
+    if (settings.continuousVertical) {
+      _animateToPage(safe, settings);
+    } else if (_pageController.hasClients) {
+      _pageController.jumpToPage(_viewerIndexForPage(safe, settings));
+    } else {
+      _animateToPage(safe, settings);
+    }
+    if ((safe - before).abs() >= 3) {
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 6),
+          content: Text('Salto a la página ${safe + 1}'),
+          action: SnackBarAction(
+            label: 'Volver a ${before + 1}',
+            onPressed: () {
+              if (mounted &&
+                  chapter == _currentChapter?.path &&
+                  !_loadingChapter) {
+                _commitPageJump(before);
+              }
+            },
+          ),
+        ),
       );
     }
-    _saveProgress();
   }
 
   void _onViewerChanged(int viewerIndex) {
@@ -558,6 +581,11 @@ class _ReaderScreenState extends State<ReaderScreen>
     setState(() {
       _imageError = false;
       _pageIndex = pageIndex;
+      if (_viewerIndexForPage(pageIndex, settings) >=
+          _viewerItemCount(settings) - 1) {
+        _showControls = true;
+        _controlsHideTimer?.cancel();
+      }
     });
     _markVisibleLoaded();
     _saveProgress();
@@ -653,7 +681,7 @@ class _ReaderScreenState extends State<ReaderScreen>
   }
 
   void _toggleControls() {
-    if (_disposing || !mounted) return;
+    if (_disposing || !mounted || _readerPanelOpen) return;
     setState(() {
       _showControls = !_showControls;
     });
@@ -1325,9 +1353,24 @@ class _ReaderScreenState extends State<ReaderScreen>
     );
   }
 
+  bool _availableOffline(Chapter chapter) {
+    if (!ContentIdentity.isRemote(chapter.path)) {
+      return chapter.complete && chapter.pageCount > 0;
+    }
+    final ref = ContentIdentity.canonical(chapter.sourceUrl ?? chapter.path);
+    return context.read<LibraryProvider>().mangas.any(
+      (m) => m.chapters.any(
+        (c) =>
+            !ContentIdentity.isRemote(c.path) &&
+            c.complete &&
+            c.pageCount > 0 &&
+            ContentIdentity.canonical(c.sourceUrl ?? c.path) == ref,
+      ),
+    );
+  }
+
   Widget _buildBottomOverlay(ThemeData theme, ReaderSettingsProvider settings) {
     final totalPages = _currentPages.length;
-    final progress = totalPages <= 1 ? 1.0 : _pageIndex / (totalPages - 1);
 
     return Positioned(
       left: 0,
@@ -1345,54 +1388,81 @@ class _ReaderScreenState extends State<ReaderScreen>
             end: Alignment.bottomCenter,
           ),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (totalPages > 1) ...[
-              SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  trackHeight: 3,
-                  thumbShape: const RoundSliderThumbShape(
-                    enabledThumbRadius: 6,
-                  ),
-                  overlayShape: const RoundSliderOverlayShape(
-                    overlayRadius: 12,
-                  ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * .65,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const ContextualTip(
+                  id: 'reader-controls',
+                  message:
+                      'Toca el centro para mostrar los controles. Arrastra la barra para previsualizar una página y suelta para saltar.',
                 ),
-                child: Slider(
-                  value: progress.clamp(0.0, 1.0),
-                  semanticFormatterCallback: (value) =>
-                      'Página ${(value * (totalPages - 1)).round() + 1} de $totalPages',
-                  onChanged: (value) {
-                    final target = (value * (totalPages - 1)).round();
-                    _animateToPage(target, settings);
+                if (!_loadingChapter &&
+                    totalPages > 0 &&
+                    _viewerIndexForPage(_pageIndex, settings) >=
+                        _viewerItemCount(settings) - 1)
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.sizeOf(context).height * .38,
+                    ),
+                    child: SingleChildScrollView(
+                      child: ReaderChapterEnd(
+                        nextTitle: _chapterIndex + 1 < _chapters.length
+                            ? _chapters[_chapterIndex + 1].title
+                            : null,
+                        hasMore: _readingDetail.hasMoreChapters,
+                        offline:
+                            _chapterIndex + 1 < _chapters.length &&
+                            _availableOffline(_chapters[_chapterIndex + 1]),
+                        onNext: () => unawaited(_goNextChapter()),
+                        onExit: () => Navigator.of(context).pop(),
+                      ),
+                    ),
+                  ),
+                ReaderPageScrubber(
+                  key: ValueKey(_currentChapter?.path),
+                  pages: _loadingChapter ? const [] : _pages,
+                  page: _pageIndex,
+                  onCommit: _commitPageJump,
+                  onInteraction: (active) {
+                    _readerPanelOpen = active;
+                    if (active) {
+                      _controlsHideTimer?.cancel();
+                    } else {
+                      _scheduleControlsHide();
+                    }
                   },
                 ),
-              ),
-              const SizedBox(height: 4),
-            ],
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(
-                  tooltip: 'Página anterior',
-                  onPressed: () => _goToRelativePage(-1),
-                  icon: const Icon(Icons.chevron_left),
-                ),
-                TextButton.icon(
-                  onPressed: _openDrawer,
-                  icon: const Icon(Icons.menu_book_outlined),
-                  label: const Text('Capítulos'),
-                  style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
-                ),
-                IconButton(
-                  tooltip: 'Página siguiente',
-                  onPressed: () => _goToRelativePage(1),
-                  icon: const Icon(Icons.chevron_right),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      tooltip: 'Página anterior',
+                      onPressed: () => _goToRelativePage(-1),
+                      icon: const Icon(Icons.chevron_left),
+                    ),
+                    TextButton.icon(
+                      onPressed: _openDrawer,
+                      icon: const Icon(Icons.menu_book_outlined),
+                      label: const Text('Capítulos'),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Página siguiente',
+                      onPressed: () => _goToRelativePage(1),
+                      icon: const Icon(Icons.chevron_right),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
