@@ -15,6 +15,7 @@ import '../models/online_manga.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/library_provider.dart';
 import '../providers/source_provider.dart';
+import '../services/hitomi_service.dart';
 import '../services/online_catalog_service.dart';
 import '../models/catalog_page.dart';
 import '../utils/catalog_cache.dart';
@@ -23,6 +24,7 @@ import '../utils/network_errors.dart';
 import '../utils/time_format.dart';
 import '../utils/title_sanitizer.dart';
 import '../widgets/category_assign_sheet.dart';
+import '../widgets/contextual_tip.dart';
 import '../widgets/continue_reading_section.dart';
 import '../widgets/home_content_layout.dart';
 import '../widgets/filter_icon_button.dart';
@@ -34,7 +36,13 @@ import 'reader_screen.dart';
 import 'online_manga_detail_screen.dart';
 
 class OnlineBrowserScreen extends StatefulWidget {
-  const OnlineBrowserScreen({super.key});
+  /// Si se indica, el explorador queda fijo en esa fuente y no cambia la fuente global.
+  final String? lockedSourceId;
+
+  /// Distingue cachés del apartado fijo, por ejemplo el idioma de Hitomi.la.
+  final String? catalogKey;
+
+  const OnlineBrowserScreen({super.key, this.lockedSourceId, this.catalogKey});
 
   @override
   State<OnlineBrowserScreen> createState() => OnlineBrowserScreenState();
@@ -81,8 +89,32 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
   }
 
   @override
+  void didUpdateWidget(OnlineBrowserScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final locked = widget.lockedSourceId;
+    if (locked == null) return;
+    final key = widget.catalogKey ?? '';
+    if (locked != _boundSourceId || key != _boundLanguageKey) {
+      _boundSourceId = locked;
+      _boundLanguageKey = key;
+      _searchController.clear();
+      _query = '';
+      unawaited(_loadHome(force: true));
+    }
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final locked = widget.lockedSourceId;
+    if (locked != null) {
+      if (_boundSourceId == null) {
+        _boundSourceId = locked;
+        _boundLanguageKey = widget.catalogKey ?? '';
+        unawaited(_loadHome());
+      }
+      return;
+    }
     final source = context.watch<SourceProvider>();
     if (!source.isLoaded) {
       return;
@@ -132,6 +164,9 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
   }
 
   Future<void> refresh() {
+    if (widget.lockedSourceId == 'hitomi') {
+      HitomiService.invalidateListings();
+    }
     if (_query.isEmpty) {
       return _loadHome(force: true);
     }
@@ -140,7 +175,7 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
 
   Future<void> _loadHome({bool force = false}) async {
     final gen = ++_catalogGen;
-    final sourceId = OnlineCatalogService.activeSourceId;
+    final sourceId = _boundSourceId ?? OnlineCatalogService.activeSourceId;
     _debounce?.cancel();
     _searchCancellation.cancel();
     _searchGen++;
@@ -153,9 +188,9 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
     _trending = [];
     _updated = [];
     _globalSearch = [];
-    final languageKey = context.read<SourceProvider>().mangaDexLanguages.join(
-      ',',
-    );
+    final languageKey = widget.lockedSourceId != null
+        ? (widget.catalogKey ?? _boundLanguageKey ?? '')
+        : context.read<SourceProvider>().mangaDexLanguages.join(',');
     final cachedHome = await CatalogCache.loadHome(
       sourceId: sourceId,
       languageKey: languageKey,
@@ -406,6 +441,8 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
   }
 
   List<String> get _enabledSearchSources {
+    final locked = widget.lockedSourceId;
+    if (locked != null) return [locked];
     final known = OnlineCatalogService.searchableSourceIds;
     final selected = known
         .where((id) => _searchSources == null || _searchSources!.contains(id))
@@ -560,10 +597,10 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
           ? _filters
           : _filters.copyWith(
               clearType: !OnlineCatalogService.adapter(
-                OnlineCatalogService.activeSourceId,
+                _boundSourceId ?? OnlineCatalogService.activeSourceId,
               ).capabilities.typeFilter,
               clearStatus: !OnlineCatalogService.adapter(
-                OnlineCatalogService.activeSourceId,
+                _boundSourceId ?? OnlineCatalogService.activeSourceId,
               ).capabilities.statusFilter,
             ),
       favorites: favorites,
@@ -571,8 +608,13 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
   }
 
   List<OnlineMangaSummary> _onlineFavorites(FavoritesProvider favorites) {
+    final locked = widget.lockedSourceId;
     return favorites.entries
         .where((entry) => entry.key.startsWith('http'))
+        .where((entry) {
+          final adult = HitomiService.isReference(entry.key);
+          return locked == 'hitomi' ? adult : !adult;
+        })
         .map(
           (entry) => OnlineMangaSummary(
             title: entry.title,
@@ -591,12 +633,12 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
       allowType:
           _query.isNotEmpty ||
           OnlineCatalogService.adapter(
-            OnlineCatalogService.activeSourceId,
+            _boundSourceId ?? OnlineCatalogService.activeSourceId,
           ).capabilities.typeFilter,
       allowStatus:
           _query.isNotEmpty ||
           OnlineCatalogService.adapter(
-            OnlineCatalogService.activeSourceId,
+            _boundSourceId ?? OnlineCatalogService.activeSourceId,
           ).capabilities.statusFilter,
       onApply: (filters) {
         setState(() => _filters = filters);
@@ -775,7 +817,8 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
     final theme = Theme.of(context);
     final library = context.watch<LibraryProvider>();
     final favorites = context.watch<FavoritesProvider>();
-    final sourceId = context.watch<SourceProvider>().activeId;
+    final sourceId =
+        widget.lockedSourceId ?? context.watch<SourceProvider>().activeId;
     final remoteProgress = _remoteRecentProgress(library, sourceId);
     final favoriteItems = _onlineFavorites(favorites);
     final filteredTrending = _applyFilters(_trending, favorites);
@@ -823,7 +866,9 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
                       children: [
                         SearchBarField(
                           controller: _searchController,
-                          hintText: _searchScopeLabel == 'Todas las fuentes'
+                          hintText: widget.lockedSourceId == 'hitomi'
+                              ? 'Título, artist:nombre o tag:etiqueta'
+                              : _searchScopeLabel == 'Todas las fuentes'
                               ? 'Buscar en todas las fuentes'
                               : 'Buscar en $_searchScopeLabel',
                           onChanged: _onSearchChanged,
@@ -839,24 +884,38 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
                           runSpacing: 4,
                           alignment: WrapAlignment.spaceBetween,
                           children: [
-                            TextButton.icon(
-                              onPressed: () =>
-                                  unawaited(_chooseSearchSources()),
-                              icon: const Icon(Icons.travel_explore, size: 18),
-                              label: Text(
-                                _query.isEmpty
-                                    ? 'Buscar: $_searchScopeLabel'
-                                    : 'Búsqueda: $_searchScopeLabel',
-                              ),
-                            ),
+                            if (widget.lockedSourceId == null)
+                              TextButton.icon(
+                                onPressed: () =>
+                                    unawaited(_chooseSearchSources()),
+                                icon: const Icon(
+                                  Icons.travel_explore,
+                                  size: 18,
+                                ),
+                                label: Text(
+                                  _query.isEmpty
+                                      ? 'Buscar: $_searchScopeLabel'
+                                      : 'Búsqueda: $_searchScopeLabel',
+                                ),
+                              )
+                            else
+                              const SizedBox.shrink(),
                             _buildFilterButton(),
                           ],
                         ),
+                        if (widget.lockedSourceId == 'hitomi')
+                          const ContextualTip(
+                            id: 'hitomi_gallery',
+                            message:
+                                'Cada resultado es una galería con sus páginas, no un manga dividido en capítulos. Puedes buscar por título o con artist:nombre, tag:etiqueta y -tag:etiqueta para excluir.',
+                          ),
                         if (_query.isEmpty)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 8),
                             child: Text(
-                              'Catálogo de ${MangaSources.byId(sourceId).name}',
+                              widget.lockedSourceId == 'hitomi'
+                                  ? 'Catálogo ${HitomiService.languageLabel(widget.catalogKey)}'
+                                  : 'Catálogo de ${MangaSources.byId(sourceId).name}',
                               style: theme.textTheme.labelMedium,
                             ),
                           ),
@@ -1162,7 +1221,11 @@ class OnlineBrowserScreenState extends State<OnlineBrowserScreen> {
       children: [
         SectionHeader(
           icon: Icons.new_releases_outlined,
-          title: 'Actualizados',
+          title: widget.lockedSourceId == null
+              ? 'Actualizados'
+              : OnlineCatalogService.adapter(
+                  widget.lockedSourceId!,
+                ).capabilities.feedLabel,
           trailing: '${items.length}',
         ),
         const SizedBox(height: 12),

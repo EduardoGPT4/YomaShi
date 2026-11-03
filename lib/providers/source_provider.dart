@@ -46,7 +46,9 @@ class SourceProvider extends ChangeNotifier {
         false;
     MangaDexService.dataSaver = _dataSaver;
     final stored = await PreferencesService.getActiveMangaSourceId();
-    if (stored != null && stored.isNotEmpty) {
+    if (stored == 'hitomi') {
+      await PreferencesService.setActiveMangaSourceId(MangaSources.defaultId);
+    } else if (stored != null && stored.isNotEmpty) {
       _active = MangaSources.byId(stored);
       if (stored == 'yupmanga' && _active.id == 'manhwaweb') {
         await PreferencesService.setActiveMangaSourceId('manhwaweb');
@@ -67,6 +69,7 @@ class SourceProvider extends ChangeNotifier {
   }
 
   Future<void> select(String sourceId) async {
+    if (sourceId == 'hitomi') return;
     final next = MangaSources.byId(sourceId);
     await PreferencesService.setActiveMangaSourceId(next.id);
     OnlineCatalogService.setActiveSourceId(next.id);

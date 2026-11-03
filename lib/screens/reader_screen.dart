@@ -504,7 +504,9 @@ class _ReaderScreenState extends State<ReaderScreen>
       pageIndex: _pageIndex,
       updatedAt: DateTime.now().millisecondsSinceEpoch,
       sourceId:
+          OnlineCatalogService.sourceIdForRef(widget.manga.sourceUrl) ??
           OnlineCatalogService.sourceIdForRef(widget.manga.path) ??
+          OnlineCatalogService.sourceIdForRef(chapter.sourceUrl) ??
           OnlineCatalogService.sourceIdForRef(chapter.path) ??
           (Uri.tryParse(widget.manga.path)?.hasScheme == true
               ? OnlineCatalogService.normalizeSourceId(

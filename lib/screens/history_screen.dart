@@ -2,28 +2,66 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/library_provider.dart';
+import '../services/hitomi_service.dart';
 import '../utils/time_format.dart';
 import '../widgets/cached_thumbnail.dart';
 import 'reader_screen.dart';
 import '../models/manga.dart';
 import '../services/online_catalog_service.dart';
 
-class HistoryScreen extends StatelessWidget {
+class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
+
+  @override
+  State<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends State<HistoryScreen> {
+  bool _adult = false;
+
+  bool _isHitomi(dynamic progress) =>
+      progress.sourceId == 'hitomi' ||
+      HitomiService.isReference(progress.mangaPath as String?) ||
+      HitomiService.isReference(progress.chapterPath as String?);
 
   @override
   Widget build(BuildContext context) {
     final library = context.watch<LibraryProvider>();
-    final items = library.getRecentProgress();
+    final items = library
+        .getRecentProgress()
+        .where((progress) => _isHitomi(progress) == _adult)
+        .toList();
     final theme = Theme.of(context);
+    final shelf = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Wrap(
+        spacing: 8,
+        children: [
+          ChoiceChip(
+            label: const Text('Mangas'),
+            selected: !_adult,
+            onSelected: (_) => setState(() => _adult = false),
+          ),
+          ChoiceChip(
+            label: const Text('+18 Hitomi.la'),
+            selected: _adult,
+            onSelected: (_) => setState(() => _adult = true),
+          ),
+        ],
+      ),
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Historial de lectura')),
       body: items.isEmpty
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(28),
-                child: Column(
+          ? Column(
+              children: [
+                shelf,
+                Expanded(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(28),
+                      child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
@@ -48,7 +86,9 @@ class HistoryScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Cuando leas un manga aparecerá aquí para retomar rápido.',
+                      _adult
+                          ? 'Cuando leas una galería de +18 Hitomi.la aparecerá aquí.'
+                          : 'Cuando leas un manga aparecerá aquí para retomar rápido.',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurface.withAlpha(170),
                         fontWeight: FontWeight.w600,
@@ -59,10 +99,17 @@ class HistoryScreen extends StatelessWidget {
                   ],
                 ),
               ),
+            ),
+                ),
+              ],
             )
-          : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: items.length,
+          : Column(
+              children: [
+                shelf,
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: items.length,
               separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final progress = items[index];
@@ -160,6 +207,9 @@ class HistoryScreen extends StatelessWidget {
                   },
                 );
               },
+                  ),
+                ),
+              ],
             ),
     );
   }

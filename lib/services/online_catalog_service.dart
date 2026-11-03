@@ -3,6 +3,7 @@ import '../models/online_manga.dart';
 import '../models/chapter.dart';
 import '../utils/app_failure.dart';
 import 'manga_source_adapter.dart';
+import 'hitomi_service.dart';
 import 'inmanga_service.dart';
 import 'mangadex_service.dart';
 import 'manhwaweb_service.dart';
@@ -83,9 +84,24 @@ class OnlineCatalogService {
       pagesRequest: ManhwaWebService.fetchChapterPages,
       capabilities: const SourceCapabilities(feedLabel: 'Nuevas obras'),
     ),
+    'hitomi': CallbackSourceAdapter(
+      id: 'hitomi',
+      catalogRequest: (p, n, q) =>
+          HitomiService.fetchCatalogPage(page: p, postsPerPage: n, search: q),
+      feedRequest: HitomiService.fetchUpdated,
+      detailRequest: HitomiService.fetchMangaDetail,
+      pagesRequest: HitomiService.fetchChapterPages,
+      capabilities: const SourceCapabilities(
+        feedLabel: 'Populares',
+        typeFilter: false,
+        statusFilter: false,
+      ),
+    ),
   };
-  static List<String> get searchableSourceIds =>
-      List.unmodifiable(adapters.keys);
+  static const Set<String> _separateSourceIds = {'hitomi'};
+  static List<String> get searchableSourceIds => List.unmodifiable(
+    adapters.keys.where((id) => !_separateSourceIds.contains(id)),
+  );
   static MangaSourceAdapter adapter(String id) {
     final value = adapters[normalizeSourceId(id)];
     if (value == null) {
@@ -99,6 +115,7 @@ class OnlineCatalogService {
     final uri = Uri.tryParse(ref.trim());
     if (uri == null) return null;
     final scheme = uri.scheme.toLowerCase();
+    if (scheme == 'hitomi') return 'hitomi';
     if (['md', 'mangadex'].contains(scheme)) return 'mangadex';
     if (['tmo', 'lectortmo'].contains(scheme)) return 'lectortmo';
     if (['inmanga', 'manhwaweb', 'zonatmo_to', 'zonatmoto'].contains(scheme)) {
@@ -106,6 +123,7 @@ class OnlineCatalogService {
     }
     final host = uri.host.toLowerCase();
     bool domain(String name) => host == name || host.endsWith('.$name');
+    if (domain('hitomi.la')) return 'hitomi';
     if (domain('mangadex.org') || domain('mangadex.network')) return 'mangadex';
     if (domain('inmanga.com') || domain('intomanga.com')) return 'inmanga';
     if (domain('manhwaweb.com') ||
@@ -145,6 +163,7 @@ class OnlineCatalogService {
     if (ZonatmoToService.needsImageHeaders(url)) {
       return ZonatmoToService.imageHeaders;
     }
+    if (HitomiService.needsImageHeaders(url)) return HitomiService.imageHeaders;
     if (TmoService.needsImageHeaders(url)) return TmoService.imageHeaders;
     if (sourceIdForRef(url) == 'inmanga') {
       return const {'Referer': 'https://inmanga.com/'};
@@ -355,6 +374,10 @@ class OnlineCatalogService {
   }
 
   static Future<List<int>> downloadBytes(String url, {String? referer}) {
+    if (HitomiService.needsImageHeaders(url) ||
+        HitomiService.isReference(referer)) {
+      return HitomiService.downloadBytes(url, referer: referer);
+    }
     final id = sourceIdForRef(referer) ?? sourceIdForRef(url);
     return switch (id) {
       'mangadex' => MangaDexService.downloadBytes(url),
