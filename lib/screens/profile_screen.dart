@@ -473,13 +473,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'Novedades 2.5.0',
+                  'Novedades 2.6.0',
                   style: theme.textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
+                  '• Traducción de imágenes en el lector online.\n'
                   '• Biblioteca unificada con filtros y favoritos online.\n'
                   '• Continuar leyendo destacado y estados en portadas.\n'
                   '• Estado de MyAnimeList visible en cada ficha.\n'

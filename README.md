@@ -22,6 +22,7 @@ Aplicación Flutter para explorar, descargar y leer manga desde InManga, MangaDe
 - Marcadores, recorte opcional de márgenes y orientación por obra.
 - Copias diarias rotativas, restauración y exportación desde Perfil → Ajustes → Biblioteca → Automatización y copias.
 - MyAnimeList para manga: búsqueda por nombre, ID o URL; estado y capítulos leídos manuales o sincronización automática opcional por obra.
+- Traducción manual de imágenes en el lector online de Android: idiomas seleccionables, comparación de texto y regreso al original. Usa Google Translate mediante ML Kit en el teléfono. [Uso y límites](TRADUCCION_LECTOR.md).
 
 ## MyAnimeList
 
@@ -38,6 +39,7 @@ Documentación:
 - [MyAnimeList 2.3, sincronización y despliegue](MEJORAS_2_3.md)
 - [Interfaz 2.4, accesibilidad y comprobaciones](MEJORAS_2_4.md)
 - [Experiencia 2.5, biblioteca unificada y controles](MEJORAS_2_5.md)
+- [Traducción de imágenes online 2.6, uso y verificación](TRADUCCION_LECTOR.md)
 
 ## Desarrollo
 
@@ -51,7 +53,7 @@ Entorno de validación: Flutter 3.47.5 estable, Dart 3.13.4, JDK 17. El SDK mín
 
 El APK de desarrollo se genera en build/app/outputs/flutter-apk/app-debug.apk. La validación automatizada está en .github/workflows/flutter.yml.
 
-Para uso personal, el APK ARM64 optimizado se compila con `flutter build apk --release --target-platform android-arm64 --split-per-abi --dart-define=YOMASHI_PERSONAL_RELEASE=true`. Este indicador explícito conserva el certificado de depuración existente para permitir actualizar la instalación actual. Conserva ese keystore para futuras actualizaciones. Flutter añade un desplazamiento por ABI al código de versión: el APK ARM64 de 2.5.0+9 utiliza 2009. Las siguientes actualizaciones deben usar el mismo comando y aumentar el número de compilación; evita sustituirlo por un APK universal con un código inferior.
+Para uso personal, el APK ARM64 optimizado se compila con `flutter build apk --release --target-platform android-arm64 --split-per-abi --dart-define=YOMASHI_PERSONAL_RELEASE=true`. Este indicador explícito conserva el certificado de depuración existente para permitir actualizar la instalación actual. Conserva ese keystore para futuras actualizaciones. Flutter añade un desplazamiento por ABI al código de versión: el APK ARM64 de 2.6.0+10 utiliza 2010. Las siguientes actualizaciones deben usar el mismo comando y aumentar el número de compilación; evita sustituirlo por un APK universal con un código inferior.
 
 Para otra firma, configura android/key.properties o las variables YOMASHI_KEYSTORE, YOMASHI_STORE_PASSWORD, YOMASHI_KEY_ALIAS y YOMASHI_KEY_PASSWORD. Las credenciales se excluyen del control de versiones. Sin firma ni indicador personal explícito, release falla.
 
