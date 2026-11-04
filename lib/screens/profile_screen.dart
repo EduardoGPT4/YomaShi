@@ -473,7 +473,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'Novedades 2.7.0',
+                  'Novedades ${HomeContentLayout.appVersion}',
                   style: theme.textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
@@ -481,6 +481,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 6),
                 Text(
                   '• Apartado +18 Hitomi.la, separado de los mangas normales.\n'
+                  '• Más idiomas en MangaDex, con búsqueda y selección múltiple.\n'
+                  '• Filtros de contenido aplicados al catálogo y al buscador.\n'
                   '• Traducción de imágenes en el lector online.\n'
                   '• Biblioteca unificada con filtros y favoritos online.\n'
                   '• Continuar leyendo destacado y estados en portadas.\n'
