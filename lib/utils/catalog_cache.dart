@@ -1,10 +1,21 @@
 import '../data/library_store.dart';
 import '../models/online_manga.dart';
+import '../services/content_exclusions.dart';
 import '../services/mangadex_service.dart';
 
 class CatalogCache {
-  static String _key(String? source, String section, String? languageKey) =>
-      '${source ?? 'default'}:${languageKey ?? (source == 'mangadex' ? MangaDexService.preferredLanguages.join(',') : '')}:$section';
+  static String _key(String? source, String section, String? languageKey) {
+    final language =
+        languageKey ??
+        (source == 'mangadex'
+            ? MangaDexService.preferredLanguages.join(',')
+            : '');
+    final exclusions = source == 'hitomi'
+        ? ':exclusions=${ContentExclusions.cacheKey}'
+        : '';
+    return '${source ?? 'default'}:$language:$section$exclusions';
+  }
+
   static Future<void> saveHome(
     List<OnlineMangaSummary> items, {
     String? sourceId,

@@ -5,6 +5,7 @@
 Aplicación Flutter para explorar, descargar y leer manga desde InManga, MangaDex, zonatmo.org y zonatmo.to, además de una biblioteca local. Se conserva el conector adicional de ManhwaWeb que ya incluía el proyecto.
 
 - Búsqueda con selección de fuentes, resultados y paginación independientes.
+- MangaDex: 42 idiomas seleccionables en Fuentes → MangaDex → Elegir idiomas, con búsqueda por nombre o código y selección múltiple guardada para catálogo, búsquedas y capítulos. Incluye variantes de español, portugués y chino.
 - Biblioteca unificada: descargados, favoritos online y lecturas recientes, con búsqueda y filtros. Guardar con el corazón no descarga páginas.
 - Continuar leyendo destacado, estados en portadas y resumen de descargas desde otras pestañas.
 - Perfil separado de Ajustes, con búsqueda de configuración y consejos contextuales descartables.
@@ -22,6 +23,7 @@ Aplicación Flutter para explorar, descargar y leer manga desde InManga, MangaDe
 - Marcadores, recorte opcional de márgenes y orientación por obra.
 - Copias diarias rotativas, restauración y exportación desde Perfil → Ajustes → Biblioteca → Automatización y copias.
 - MyAnimeList para manga: búsqueda por nombre, ID o URL; estado y capítulos leídos manuales o sincronización automática opcional por obra.
+- Traducción manual de imágenes en el lector online de Android: idiomas seleccionables, comparación de texto y regreso al original. Usa Google Translate mediante ML Kit en el teléfono. [Uso y límites](docs/reader/TRADUCCION_LECTOR.md).
 
 ## MyAnimeList
 
@@ -32,12 +34,20 @@ El perfil muestra automáticamente el nombre, `@usuario` y foto de la cuenta MAL
 La conexión requiere el servicio de `server/` instalado en el alojamiento privado de YomaTV. `python tools/install_mal_backend.py --web-root RUTA_A_YOMATVWEB` prepara la extensión en su código existente; después se publica con el procedimiento de releases del sitio. Usa el callback registrado del sitio y mantiene el secreto de cliente y los tokens de MAL en el servidor cifrados; Android guarda una credencial de dispositivo cifrada con Android Keystore. No incluyas secretos de configuración ni claves de firma en GitHub. El servidor necesita HTTPS, PHP con OpenSSL y cURL, y acceso a su base de datos. Referencia: [API de MyAnimeList](https://myanimelist.net/apiconfig/references/api/v2).
 
 Documentación:
-- [Arquitectura y flujos](ESTRUCTURA.md)
-- [Implementación de los 49 puntos del informe](IMPLEMENTACION.md)
-- [Mejoras 2.2, validación y APK personal](MEJORAS_2_2.md)
-- [MyAnimeList 2.3, sincronización y despliegue](MEJORAS_2_3.md)
-- [Interfaz 2.4, accesibilidad y comprobaciones](MEJORAS_2_4.md)
-- [Experiencia 2.5, biblioteca unificada y controles](MEJORAS_2_5.md)
+- [Índice y organización del repositorio](docs/README.md)
+- [Arquitectura y flujos](docs/architecture/ESTRUCTURA.md)
+- [Implementación de los 49 puntos del informe](docs/releases/IMPLEMENTACION.md)
+- [Mejoras 2.2, validación y APK personal](docs/releases/MEJORAS_2_2.md)
+- [MyAnimeList 2.3, sincronización y despliegue](docs/releases/MEJORAS_2_3.md)
+- [Interfaz 2.4, accesibilidad y comprobaciones](docs/releases/MEJORAS_2_4.md)
+- [Experiencia 2.5, biblioteca unificada y controles](docs/releases/MEJORAS_2_5.md)
+- [Traducción de imágenes online, uso y verificación](docs/reader/TRADUCCION_LECTOR.md)
+
+## Organización del proyecto
+
+El código de la app está en `lib/`; la documentación, en `docs/`; y las pruebas locales se agrupan en `test/unit/`, `test/services/` y `test/widgets/`. Las pruebas opcionales con servicios reales están en `test/live/` y las del servidor en `test/backend/`. [Guía de pruebas](test/README.md).
+
+Las herramientas de mantenimiento permanecen en `tools/`. Los registros históricos, notas, parches y copias de diagnóstico están ordenados en `build/reports/`. Flutter conserva sus salidas en `build/app/outputs/`.
 
 ## Desarrollo
 
@@ -69,4 +79,4 @@ Las nuevas descargas usan identificadores estables y manifiestos. Cambiar la car
 
 En Android el servicio usa foreground dataSync y una notificación con acción de pausa. Android puede imponer límites de ejecución y restricciones del fabricante; al alcanzar el timeout se guarda y pausa la cola. Consulta los [límites oficiales de servicios de Android](https://developer.android.com/develop/background-work/services/fgs/timeout).
 
-Los tests de fuentes usan respuestas locales controladas. Además, se probaron los cuatro sitios reales, descargas, pausa, lectura local, rotación y pantalla apagada en un POCO X6 Pro con Android 16; los resultados y límites están en [PRUEBAS_TELEFONO.md](PRUEBAS_TELEFONO.md). No se ha añadido un servicio equivalente en iOS.
+Los tests de fuentes usan respuestas locales controladas. Además, se probaron los cuatro sitios reales, descargas, pausa, lectura local, rotación y pantalla apagada en un POCO X6 Pro con Android 16; los resultados y límites están en [PRUEBAS_TELEFONO.md](docs/testing/PRUEBAS_TELEFONO.md). No se ha añadido un servicio equivalente en iOS.

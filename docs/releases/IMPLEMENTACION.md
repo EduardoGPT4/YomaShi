@@ -75,7 +75,7 @@ Se implementaron las correcciones y mejoras del informe en las cuatro fuentes so
 
 ## Verificación
 
-Resultados: **78 pruebas aprobadas**, incluidos los tests originales y regresiones añadidas; análisis Flutter sin incidencias y APK de desarrollo Android compilado. El formato de Dart también se comprueba en CI. La comprobación posterior en un POCO X6 Pro con Android 16 y sus correcciones se documentan en [PRUEBAS_TELEFONO.md](PRUEBAS_TELEFONO.md).
+Resultados: **78 pruebas aprobadas**, incluidos los tests originales y regresiones añadidas; análisis Flutter sin incidencias y APK de desarrollo Android compilado. El formato de Dart también se comprueba en CI. La comprobación posterior en un POCO X6 Pro con Android 16 y sus correcciones se documentan en [PRUEBAS_TELEFONO.md](../testing/PRUEBAS_TELEFONO.md).
 
 La suite incluye prioridad durante transferencia, pausa, reanudación de selección discontinua, capítulos vacíos, fallo de carpeta, raíz fija, identidades, respuesta HTML, imagen incompleta, HTTP permanente/transitorio, compresión gzip y copia de archivos. Incluye contratos de las cuatro fuentes, feed MangaDex de 2.100 capítulos, zonatmo.to de 41 páginas, listas parciales y resolución del capítulo guardado.
 

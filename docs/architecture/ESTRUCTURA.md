@@ -32,6 +32,8 @@ ZonaTMO.to utiliza su API propia, ordena imágenes por page_number y no impone e
 
 Los bloques de capítulos declaran hasMore y nextCursor. La ficha muestra que la lista es parcial y permite cargar más; el lector solicita el siguiente bloque al alcanzar el final. Continuar una lectura guardada busca el capítulo en los bloques posteriores. Descargar todo resuelve antes el plan completo.
 
+Las [exclusiones de contenido](EXCLUSIONES.md) se configuran en `services/content_exclusions.dart`. El catálogo y el buscador reutilizan la misma lista; la caché de IDs excluidos también reside en ese componente, con carga limitada y manejo de errores comprobado con índices simulados.
+
 ## Descargas e integridad
 
 Cada trabajo conserva su raíz de destino, selección de capítulos y capítulos confirmados. La selección vacía no significa descargar todo. Pausa y preempción cancelan operaciones activas y devuelven el trabajador al planificador.
@@ -96,4 +98,4 @@ El registro de diagnóstico está acotado a cien eventos y omite cuerpos, cabece
 
 La suite cubre las regresiones de integridad, pausa, prioridad, reinicio, raíz fija, copia, HTTP y compresión; contratos locales de las fuentes; bloques de series largas; backup transaccional e importación; lector con errores/webtoon; pliegos y puente nativo.
 
-El workflow ejecuta formato, análisis, tests y compilación Android. La firma release utiliza exclusivamente credenciales externas; el APK debug firmado permite uso personal. [PRUEBAS_TELEFONO.md](PRUEBAS_TELEFONO.md) recoge la validación real en un POCO X6 Pro con Android 16. Otros fabricantes e iOS requieren sus entornos correspondientes.
+El workflow ejecuta formato, análisis, tests y compilación Android. La firma release utiliza exclusivamente credenciales externas; el APK debug firmado permite uso personal. [PRUEBAS_TELEFONO.md](../testing/PRUEBAS_TELEFONO.md) recoge la validación real en un POCO X6 Pro con Android 16. Otros fabricantes e iOS requieren sus entornos correspondientes.

@@ -38,6 +38,8 @@ void main() {
   late HttpServer server;
   late HttpClient raw;
   var largeFeed = false;
+  var multilingualFeed = false;
+  final requestedUris = <Uri>[];
   setUpAll(() async {
     raw = HttpOverrides.runWithHttpOverrides(() => HttpClient(), RealHttp());
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -45,6 +47,7 @@ void main() {
       FixtureHttp(raw, Uri.parse('http://127.0.0.1:${server.port}')),
     );
     server.listen((request) async {
+      requestedUris.add(request.uri);
       final path = request.uri.path;
       Object? body;
       if (path == '/manga/$mangaId') {
@@ -69,6 +72,26 @@ void main() {
                   'volume': '1',
                   'chapter': i.toString(),
                   'translatedLanguage': 'es',
+                },
+              },
+          ],
+        };
+      } else if (path == '/manga/$mangaId/feed' && multilingualFeed) {
+        body = {
+          'total': 3,
+          'data': [
+            for (final (id, language, chapter) in [
+              ('portuguese-1', 'pt-br', '1'),
+              ('english-1', 'en', '1'),
+              ('portuguese-2', 'pt-br', '2'),
+            ])
+              {
+                'id': id,
+                'attributes': {
+                  'pages': 2,
+                  'volume': '1',
+                  'chapter': chapter,
+                  'translatedLanguage': language,
                 },
               },
           ],
@@ -171,6 +194,57 @@ void main() {
     await server.close(force: true);
     raw.close(force: true);
   });
+
+  setUp(() {
+    requestedUris.clear();
+    multilingualFeed = false;
+    MangaDexService.setPreferredLanguages(MangaDexLanguage.defaultCodes);
+  });
+
+  tearDown(() {
+    multilingualFeed = false;
+    MangaDexService.setPreferredLanguages(MangaDexLanguage.defaultCodes);
+  });
+
+  test(
+    'MangaDex sends all selected languages in search and pagination',
+    () async {
+      MangaDexService.setPreferredLanguages(['en', 'pt-br', 'zh-hk']);
+      await MangaDexService.search('A & B');
+      await MangaDexService.fetchCatalogPage(page: 2, postsPerPage: 12);
+
+      final requests = requestedUris
+          .where((uri) => uri.path == '/manga')
+          .toList();
+      expect(requests, hasLength(2));
+      for (final request in requests) {
+        expect(request.queryParametersAll['availableTranslatedLanguage[]'], [
+          'en',
+          'pt-br',
+          'zh-hk',
+        ]);
+      }
+      expect(requests.first.queryParameters['title'], 'A & B');
+      expect(requests.last.queryParameters['offset'], '12');
+    },
+  );
+
+  test(
+    'MangaDex filters chapters and deduplicates using selected language order',
+    () async {
+      multilingualFeed = true;
+      MangaDexService.setPreferredLanguages(['en', 'pt-br']);
+      final detail = await MangaDexService.fetchMangaDetail(mangaId);
+
+      final feed = requestedUris.singleWhere(
+        (uri) => uri.path.endsWith('/feed'),
+      );
+      expect(feed.queryParametersAll['translatedLanguage[]'], ['en', 'pt-br']);
+      expect(detail.chapters, hasLength(2));
+      expect(detail.chapters.first.language, 'en');
+      expect(detail.chapters.last.language, 'pt-br');
+    },
+  );
 
   test(
     'MangaDex deduplicates translated titles by volume and chapter',

@@ -31,7 +31,7 @@ class SourceProvider extends ChangeNotifier {
   bool get isLoaded => _loaded;
   List<MangaSource> get sources => MangaSources.all;
 
-  /// Idiomas MangaDex activos (`es`, `es-la`).
+  /// Idiomas MangaDex activos, también usados por búsquedas y capítulos.
   List<String> get mangaDexLanguages =>
       List<String>.unmodifiable(_mangaDexLanguages);
 
@@ -46,7 +46,9 @@ class SourceProvider extends ChangeNotifier {
         false;
     MangaDexService.dataSaver = _dataSaver;
     final stored = await PreferencesService.getActiveMangaSourceId();
-    if (stored != null && stored.isNotEmpty) {
+    if (stored == 'hitomi') {
+      await PreferencesService.setActiveMangaSourceId(MangaSources.defaultId);
+    } else if (stored != null && stored.isNotEmpty) {
       _active = MangaSources.byId(stored);
       if (stored == 'yupmanga' && _active.id == 'manhwaweb') {
         await PreferencesService.setActiveMangaSourceId('manhwaweb');
@@ -54,11 +56,7 @@ class SourceProvider extends ChangeNotifier {
     }
 
     final langs = await PreferencesService.getMangaDexLanguages();
-    if (langs.isNotEmpty) {
-      _mangaDexLanguages = langs;
-    } else {
-      _mangaDexLanguages = List<String>.from(MangaDexLanguage.defaultCodes);
-    }
+    _mangaDexLanguages = MangaDexLanguage.normalizeCodes(langs);
     MangaDexService.setPreferredLanguages(_mangaDexLanguages);
 
     OnlineCatalogService.setActiveSourceId(_active.id);
@@ -67,6 +65,7 @@ class SourceProvider extends ChangeNotifier {
   }
 
   Future<void> select(String sourceId) async {
+    if (sourceId == 'hitomi') return;
     final next = MangaSources.byId(sourceId);
     await PreferencesService.setActiveMangaSourceId(next.id);
     OnlineCatalogService.setActiveSourceId(next.id);
@@ -77,9 +76,11 @@ class SourceProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Activa/desactiva un idioma de MangaDex (España / Latino).
+  /// Activa/desactiva un idioma de capítulos de MangaDex.
   /// Debe quedar al menos uno seleccionado.
   Future<void> toggleMangaDexLanguage(String code) async {
+    code = code.trim().toLowerCase();
+    if (!MangaDexLanguage.supports(code)) return;
     final next = List<String>.from(_mangaDexLanguages);
     if (next.contains(code)) {
       if (next.length <= 1) {

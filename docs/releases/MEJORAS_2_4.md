@@ -33,7 +33,7 @@ Cambios derivados de las 17 capturas revisadas el 28 de octubre de 2026.
 - Regresiones nuevas: historial de 500 capítulos, selector de 1.200 capítulos, vistas de 320 puntos con texto ampliado, reintento de pendientes, almacenamiento asíncrono, autorización pendiente reutilizable, identidad de MAL, contraste de acentos y búsqueda conservada entre pestañas.
 - Capturas reproducibles sin red ni cuentas reales:
 
-  `flutter test test/ui_preview_test.dart --dart-define=YOMASHI_UI_CAPTURE=true --update-goldens`
+  `flutter test test/widgets/ui_preview_test.dart --dart-define=YOMASHI_UI_CAPTURE=true --update-goldens`
 
   Se guardan en `build/verification/ui-2.4.0/`, excluido de Git. Usan el tema real y fuentes del SDK.
 

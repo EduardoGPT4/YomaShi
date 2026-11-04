@@ -14,7 +14,9 @@ import '../services/alternative_chapter_service.dart';
 import '../services/myanimelist_service.dart';
 import 'myanimelist_screen.dart';
 import '../widgets/alternative_chapter_picker.dart';
+
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -38,6 +40,11 @@ import '../utils/reader_paging.dart';
 import '../services/online_catalog_service.dart';
 import '../widgets/chapter_drawer.dart';
 import '../widgets/reader_settings_panel.dart';
+
+import '../models/page_translation.dart';
+import '../services/page_translation_service.dart';
+import '../widgets/online_translation_sheet.dart';
+import '../widgets/translation_attribution.dart';
 
 class ReaderScreen extends StatefulWidget {
   final Manga manga;
@@ -92,6 +99,31 @@ class _ReaderScreenState extends State<ReaderScreen>
   int _drawerRevision = 0;
   int _chapterOpenGen = 0;
   Timer? _controlsHideTimer;
+  final _translation = PageTranslationService(
+    imageHeaders: OnlineCatalogService.imageRequestHeaders,
+  );
+  final _translatedPages = <String, PageTranslation>{};
+
+  bool get _canTranslate =>
+      PageTranslationService.supported &&
+      !_loadingChapter &&
+      _currentChapter != null &&
+      _isRemotePath(_currentChapter!.path) &&
+      _pages.isNotEmpty &&
+      ['http', 'https'].contains(Uri.tryParse(_pages[_pageIndex])?.scheme);
+
+  bool get _hasVisibleTranslation {
+    if (_pages.isEmpty || _loadingChapter) return false;
+    final settings = context.read<ReaderSettingsProvider>();
+    final count =
+        _useDoublePage(settings) && !(settings.coverAlone && _pageIndex == 0)
+        ? 2
+        : 1;
+    return _pages.skip(_pageIndex).take(count).any((url) {
+      final translation = _translatedPages[url];
+      return translation != null && File(translation.imagePath).existsSync();
+    });
+  }
 
   Chapter? get _currentChapter {
     if (_chapters.isEmpty) {
@@ -195,6 +227,7 @@ class _ReaderScreenState extends State<ReaderScreen>
   @override
   void dispose() {
     _disposing = true;
+    unawaited(_translation.dispose().catchError((_) {}));
     _readerHeartbeat?.cancel();
     _queue?.setReaderActive(false);
     SystemChrome.setPreferredOrientations([]);
@@ -473,7 +506,9 @@ class _ReaderScreenState extends State<ReaderScreen>
       pageIndex: _pageIndex,
       updatedAt: DateTime.now().millisecondsSinceEpoch,
       sourceId:
+          OnlineCatalogService.sourceIdForRef(widget.manga.sourceUrl) ??
           OnlineCatalogService.sourceIdForRef(widget.manga.path) ??
+          OnlineCatalogService.sourceIdForRef(chapter.sourceUrl) ??
           OnlineCatalogService.sourceIdForRef(chapter.path) ??
           (Uri.tryParse(widget.manga.path)?.hasScheme == true
               ? OnlineCatalogService.normalizeSourceId(
@@ -797,6 +832,10 @@ class _ReaderScreenState extends State<ReaderScreen>
     _readerPanelOpen = true;
     try {
       switch (action) {
+        case 'translate':
+          await _openTranslation();
+        case 'translation-original':
+          _showOriginalTranslation();
         case 'save':
           await _bookmark();
         case 'list':
@@ -829,6 +868,80 @@ class _ReaderScreenState extends State<ReaderScreen>
       _readerPanelOpen = false;
       if (mounted) _scheduleControlsHide();
     }
+  }
+
+  Future<void> _openTranslation() async {
+    if (!_canTranslate) return;
+    final chapter = _currentChapter!.path;
+    final settings = context.read<ReaderSettingsProvider>();
+    final count =
+        _useDoublePage(settings) && !(settings.coverAlone && _pageIndex == 0)
+        ? 2
+        : 1;
+    final pages = [
+      for (var i = _pageIndex; i < _pageIndex + count && i < _pages.length; i++)
+        if (['http', 'https'].contains(Uri.tryParse(_pages[i])?.scheme))
+          (number: i + 1, url: _pages[i]),
+    ];
+    final result = await showModalBottomSheet<PageTranslation>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => OnlineTranslationSheet(
+        service: _translation,
+        pages: pages,
+        previous: _translatedPages,
+      ),
+    );
+    if (!mounted ||
+        chapter != _currentChapter?.path ||
+        result == null ||
+        !_pages.contains(result.url)) {
+      return;
+    }
+    _translatedPages.remove(result.url);
+    _translatedPages[result.url] = result;
+    while (_translatedPages.length > 8) {
+      _translatedPages.remove(_translatedPages.keys.first);
+    }
+    _refreshTranslationImages();
+  }
+
+  void _showOriginalTranslation() {
+    final settings = context.read<ReaderSettingsProvider>();
+    final count =
+        _useDoublePage(settings) && !(settings.coverAlone && _pageIndex == 0)
+        ? 2
+        : 1;
+    for (var i = _pageIndex; i < _pageIndex + count && i < _pages.length; i++) {
+      _translatedPages.remove(_pages[i]);
+    }
+    _refreshTranslationImages();
+  }
+
+  void _refreshTranslationImages() {
+    for (final record in _streams.values) {
+      record.stream.removeListener(record.listener);
+    }
+    _streams.clear();
+    _loadedPages.clear();
+    _dimensions.clear();
+    final settings = context.read<ReaderSettingsProvider>();
+    final oldController = _pageController;
+    final viewer = _viewerIndexForPage(_pageIndex, settings);
+    setState(() {
+      _webtoonAnchor = _pageIndex;
+      _imageRevision++;
+      _pageController = PageController(initialPage: viewer);
+      _showControls = true;
+      _imageError = false;
+    });
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => oldController.dispose(),
+    );
+    _precacheVisiblePages();
+    _scheduleControlsHide();
   }
 
   Future<void> _goNextChapter() async {
@@ -1029,6 +1142,22 @@ class _ReaderScreenState extends State<ReaderScreen>
               ),
             if (_showControls) _buildTopOverlay(theme, chapter, settings),
             if (_showControls) _buildBottomOverlay(theme, settings),
+            if (!_showControls && _hasVisibleTranslation)
+              Positioned(
+                bottom: 8,
+                left: 8,
+                right: 8,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Tooltip(
+                    message: 'Ver página original',
+                    child: TextButton(
+                      onPressed: _showOriginalTranslation,
+                      child: const TranslationAttribution(),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -1303,6 +1432,16 @@ class _ReaderScreenState extends State<ReaderScreen>
                   ),
                 );
                 return [
+                  if (_canTranslate) ...[
+                    item('translate', Icons.translate, 'Traducir página'),
+                    if (_translatedPages.isNotEmpty)
+                      item(
+                        'translation-original',
+                        Icons.image_outlined,
+                        'Ver páginas originales',
+                      ),
+                    const PopupMenuDivider(),
+                  ],
                   item(
                     'quality',
                     _originalQuality ? Icons.hd : Icons.hd_outlined,
@@ -1401,6 +1540,19 @@ class _ReaderScreenState extends State<ReaderScreen>
                   message:
                       'Toca el centro para mostrar los controles. Arrastra la barra para previsualizar una página y suelta para saltar.',
                 ),
+                if (_hasVisibleTranslation)
+                  TextButton.icon(
+                    onPressed: _showOriginalTranslation,
+                    icon: const Icon(Icons.image_outlined),
+                    label: const Wrap(
+                      spacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        TranslationAttribution(),
+                        Text('Ver original'),
+                      ],
+                    ),
+                  ),
                 if (!_loadingChapter &&
                     totalPages > 0 &&
                     _viewerIndexForPage(_pageIndex, settings) >=
@@ -1601,8 +1753,11 @@ class _ReaderScreenState extends State<ReaderScreen>
                 MediaQuery.devicePixelRatioOf(context))
             .round()
             .clamp(360, 1440);
+    final translated = _translatedPages[path];
     return boundedImage(
-      path,
+      translated != null && File(translated.imagePath).existsSync()
+          ? translated.imagePath
+          : path,
       width: width,
       original: _originalQuality,
       cropWhite: _settings?.cropWhite ?? false,

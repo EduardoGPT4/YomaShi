@@ -7,6 +7,7 @@ class MangaFilterSheet extends StatefulWidget {
   final MangaListFilters initialFilters;
   final bool isOnline;
   final bool allowType, allowStatus;
+  final bool showHitomiTags;
   final ValueChanged<MangaListFilters> onApply;
 
   const MangaFilterSheet({
@@ -15,6 +16,7 @@ class MangaFilterSheet extends StatefulWidget {
     required this.isOnline,
     this.allowType = true,
     this.allowStatus = true,
+    this.showHitomiTags = false,
     required this.onApply,
   });
 
@@ -24,6 +26,7 @@ class MangaFilterSheet extends StatefulWidget {
     required bool isOnline,
     bool allowType = true,
     bool allowStatus = true,
+    bool showHitomiTags = false,
     required ValueChanged<MangaListFilters> onApply,
   }) {
     return showModalBottomSheet<void>(
@@ -39,6 +42,7 @@ class MangaFilterSheet extends StatefulWidget {
           isOnline: isOnline,
           allowType: allowType,
           allowStatus: allowStatus,
+          showHitomiTags: showHitomiTags,
           onApply: onApply,
         );
       },
@@ -108,6 +112,20 @@ class _MangaFilterSheetState extends State<MangaFilterSheet> {
                 },
                 title: const Text('Solo favoritos'),
               ),
+              if (widget.showHitomiTags)
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  value: _filters.showPopularTags,
+                  onChanged: (value) {
+                    setState(() {
+                      _filters = _filters.copyWith(showPopularTags: value);
+                    });
+                  },
+                  title: const Text('Etiquetas más buscadas'),
+                  subtitle: const Text(
+                    'Muestra bajo el buscador artistas, grupos, series, personajes, géneros, tipos e idiomas con más galerías.',
+                  ),
+                ),
               if (!widget.isOnline) ...[
                 const SizedBox(height: 8),
                 Text('Progreso de lectura', style: theme.textTheme.labelLarge),

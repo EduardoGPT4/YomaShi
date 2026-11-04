@@ -29,11 +29,71 @@ class MangaDexLanguage {
     label: 'Español (Latino)',
   );
 
-  /// Opciones seleccionables en Fuentes (sin inglés).
-  static const selectable = <MangaDexLanguage>[castilian, latin];
+  /// Idiomas de capítulos; las variantes regionales usan los códigos de MangaDex.
+  /// https://api.mangadex.org/docs/3-enumerations/#language-codes--localization
+  static const selectable = <MangaDexLanguage>[
+    castilian,
+    latin,
+    MangaDexLanguage(code: 'de', label: 'Alemán'),
+    MangaDexLanguage(code: 'ar', label: 'Árabe'),
+    MangaDexLanguage(code: 'bn', label: 'Bengalí'),
+    MangaDexLanguage(code: 'bg', label: 'Búlgaro'),
+    MangaDexLanguage(code: 'ca', label: 'Catalán'),
+    MangaDexLanguage(code: 'cs', label: 'Checo'),
+    MangaDexLanguage(code: 'zh', label: 'Chino (simplificado)'),
+    MangaDexLanguage(code: 'zh-hk', label: 'Chino (tradicional)'),
+    MangaDexLanguage(code: 'ko', label: 'Coreano'),
+    MangaDexLanguage(code: 'hr', label: 'Croata'),
+    MangaDexLanguage(code: 'da', label: 'Danés'),
+    MangaDexLanguage(code: 'sk', label: 'Eslovaco'),
+    MangaDexLanguage(code: 'sl', label: 'Esloveno'),
+    MangaDexLanguage(code: 'fi', label: 'Finés'),
+    MangaDexLanguage(code: 'fr', label: 'Francés'),
+    MangaDexLanguage(code: 'el', label: 'Griego'),
+    MangaDexLanguage(code: 'he', label: 'Hebreo'),
+    MangaDexLanguage(code: 'hi', label: 'Hindi'),
+    MangaDexLanguage(code: 'hu', label: 'Húngaro'),
+    MangaDexLanguage(code: 'id', label: 'Indonesio'),
+    MangaDexLanguage(code: 'en', label: 'Inglés'),
+    MangaDexLanguage(code: 'it', label: 'Italiano'),
+    MangaDexLanguage(code: 'ja', label: 'Japonés'),
+    MangaDexLanguage(code: 'lt', label: 'Lituano'),
+    MangaDexLanguage(code: 'ms', label: 'Malayo'),
+    MangaDexLanguage(code: 'nl', label: 'Neerlandés'),
+    MangaDexLanguage(code: 'no', label: 'Noruego'),
+    MangaDexLanguage(code: 'fa', label: 'Persa'),
+    MangaDexLanguage(code: 'pl', label: 'Polaco'),
+    MangaDexLanguage(code: 'pt', label: 'Portugués (Portugal)'),
+    MangaDexLanguage(code: 'pt-br', label: 'Portugués (Brasil)'),
+    MangaDexLanguage(code: 'ro', label: 'Rumano'),
+    MangaDexLanguage(code: 'ru', label: 'Ruso'),
+    MangaDexLanguage(code: 'sr', label: 'Serbio'),
+    MangaDexLanguage(code: 'sv', label: 'Sueco'),
+    MangaDexLanguage(code: 'tl', label: 'Tagalo'),
+    MangaDexLanguage(code: 'th', label: 'Tailandés'),
+    MangaDexLanguage(code: 'tr', label: 'Turco'),
+    MangaDexLanguage(code: 'uk', label: 'Ucraniano'),
+    MangaDexLanguage(code: 'vi', label: 'Vietnamita'),
+  ];
 
-  /// Por defecto: España + Latino (sin English).
+  /// Conserva la selección inicial de España + Latino.
   static const defaultCodes = <String>['es', 'es-la'];
+
+  static final _supportedCodes = selectable
+      .map((language) => language.code)
+      .toSet();
+
+  static bool supports(String code) => _supportedCodes.contains(code);
+
+  /// Mismo saneado para la interfaz y el servicio de descargas en segundo plano.
+  static List<String> normalizeCodes(Iterable<String> codes) {
+    final cleaned = codes
+        .map((code) => code.trim().toLowerCase())
+        .where(supports)
+        .toSet()
+        .toList();
+    return cleaned.isEmpty ? List<String>.from(defaultCodes) : cleaned;
+  }
 }
 
 class MangaDexService {
@@ -59,16 +119,9 @@ class MangaDexService {
   static List<String> get preferredLanguages =>
       List<String>.unmodifiable(_preferredLanguages);
 
-  /// Actualiza idiomas preferidos (sin inglés salvo que el caller lo ponga).
+  /// Actualiza idiomas preferidos conservando su orden de prioridad.
   static void setPreferredLanguages(List<String> codes) {
-    final cleaned = codes
-        .map((c) => c.trim())
-        .where((c) => c.isNotEmpty)
-        .toSet()
-        .toList();
-    _preferredLanguages = cleaned.isEmpty
-        ? List<String>.from(MangaDexLanguage.defaultCodes)
-        : cleaned;
+    _preferredLanguages = MangaDexLanguage.normalizeCodes(codes);
   }
 
   static List<String> _languageQueryParams(

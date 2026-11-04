@@ -7,6 +7,8 @@ class SearchBarField extends StatelessWidget {
   final String hintText;
   final ValueChanged<String>? onChanged;
   final VoidCallback? onClear;
+  final ValueChanged<String>? onSubmitted;
+  final FocusNode? focusNode;
 
   const SearchBarField({
     super.key,
@@ -14,6 +16,8 @@ class SearchBarField extends StatelessWidget {
     required this.hintText,
     this.onChanged,
     this.onClear,
+    this.onSubmitted,
+    this.focusNode,
   });
 
   @override
@@ -26,7 +30,12 @@ class SearchBarField extends StatelessWidget {
       builder: (context, value, _) {
         return TextField(
           controller: controller,
+          focusNode: focusNode,
           onChanged: onChanged,
+          onSubmitted: onSubmitted,
+          textInputAction: onSubmitted == null
+              ? TextInputAction.done
+              : TextInputAction.search,
           decoration: InputDecoration(
             hintText: hintText,
             prefixIcon: Icon(

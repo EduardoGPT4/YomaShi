@@ -8,6 +8,7 @@ import '../providers/categories_provider.dart';
 import '../providers/chapter_read_provider.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/library_provider.dart';
+import '../services/hitomi_service.dart';
 import '../services/online_catalog_service.dart';
 import '../services/myanimelist_service.dart';
 import 'myanimelist_screen.dart';
@@ -35,6 +36,7 @@ class _LibraryScreenState extends State<LibraryScreen>
     with WidgetsBindingObserver {
   final _search = TextEditingController();
   LibraryView _view = LibraryView.all;
+  bool _adultShelf = false;
   String? _category;
   Map<String, String> _links = {};
   List<Map<String, dynamic>> _updates = [];
@@ -196,6 +198,10 @@ class _LibraryScreenState extends State<LibraryScreen>
   bool _matchesView(LibraryEntry entry, LibraryView view) =>
       entry.matches(view, readingStatus: _statuses[entry.key]);
 
+  bool _isHitomiEntry(LibraryEntry entry) =>
+      entry.progress?.sourceId == 'hitomi' ||
+      entry.references.any(HitomiService.isReference);
+
   int _newCount(LibraryEntry entry, ChapterReadProvider read) {
     final refs = {entry.key, entry.favorite?.key, entry.local?.path};
     final chapters = <String>{};
@@ -220,7 +226,7 @@ class _LibraryScreenState extends State<LibraryScreen>
       favorites: favorites.entries,
       progress: library.getRecentProgress(),
       sourceLinks: _links,
-    );
+    ).where((entry) => _isHitomiEntry(entry) == _adultShelf).toList();
     final recent = entries.where((e) => e.progress != null).toList()
       ..sort((a, b) => b.progress!.updatedAt.compareTo(a.progress!.updatedAt));
     final visible = entries
@@ -301,6 +307,17 @@ class _LibraryScreenState extends State<LibraryScreen>
                       spacing: 8,
                       runSpacing: 4,
                       children: [
+                        ChoiceChip(
+                          label: const Text('Mangas'),
+                          selected: !_adultShelf,
+                          onSelected: (_) =>
+                              setState(() => _adultShelf = false),
+                        ),
+                        ChoiceChip(
+                          label: const Text('+18 Hitomi.la'),
+                          selected: _adultShelf,
+                          onSelected: (_) => setState(() => _adultShelf = true),
+                        ),
                         for (final view in LibraryView.values)
                           ChoiceChip(
                             label: Text(
@@ -339,10 +356,12 @@ class _LibraryScreenState extends State<LibraryScreen>
                     if (_error != null) Text(_error!),
                     const SizedBox(height: 12),
                     if (visible.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 32),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32),
                         child: Text(
-                          'No hay mangas en esta vista. Prueba otro filtro o guarda uno desde Inicio.',
+                          _adultShelf
+                              ? 'No hay galerías +18 en esta vista. Guárdalas desde +18 Hitomi.la.'
+                              : 'No hay mangas en esta vista. Prueba otro filtro o guarda uno desde Inicio.',
                           textAlign: TextAlign.center,
                         ),
                       ),

@@ -24,7 +24,7 @@ Completa las tareas solicitadas de principio a fin. Prioriza trabajar y entregar
 
 \- No detengas el trabajo para pedir confirmación sobre decisiones reversibles.
 
-\- Si encuentras un error relacionado con la tarea, corrígelo aunque no se mencione explícitamente.
+\- Corrige errores directamente relacionados con la tarea. Si detectas problemas ajenos a su alcance, evita ampliar innecesariamente los cambios, salvo que impidan completarla.
 
 \- No abandones una tarea después de implementar solo una parte.
 
@@ -59,6 +59,46 @@ Completa las tareas solicitadas de principio a fin. Prioriza trabajar y entregar
 \- No afirmes que algo funciona si no pudiste verificarlo.
 
 \- Detente cuando la tarea esté completa y suficientemente comprobada.
+
+
+\## Depuración y diagnóstico de errores
+
+
+## Depuración y diagnóstico de errores
+
+- Antes de corregir un error, investiga su causa raíz. No modifiques código basándote únicamente en suposiciones.
+- Intenta reproducir el problema mediante pruebas, ejecución, registros o análisis estático, según las herramientas disponibles.
+- Examina primero los mensajes de error, stack traces, logs y componentes relacionados.
+- Formula hipótesis concretas y contrástalas con evidencias antes de implementar una solución.
+- Distingue entre la causa raíz del problema y sus síntomas. Prioriza resolver la causa raíz.
+- Evita soluciones temporales, excepciones silenciadas y mecanismos que oculten errores sin resolverlos.
+- No elimines funcionalidades ni desactives validaciones o pruebas para conseguir que una compilación termine correctamente.
+- Prioriza correcciones pequeñas y localizadas que respeten la arquitectura existente.
+- Si un primer intento falla, analiza el resultado antes de probar otra solución. No repitas cambios equivalentes sin nueva evidencia.
+- Cuando sea viable, crea una prueba que reproduzca el fallo antes de corregirlo y comprueba que pasa después.
+- Después de cada corrección, verifica tanto el comportamiento afectado como las funcionalidades relacionadas para detectar regresiones.
+- Si el error depende de servicios externos, permisos, credenciales o condiciones del entorno, identifica claramente esa dependencia.
+- Si no puedes reproducir o verificar un error, utiliza la evidencia disponible, aplica únicamente cambios justificados y declara la limitación.
+- No declares resuelto un problema basándote únicamente en que el código compila.
+
+### Diagnóstico de aplicaciones Android
+
+- Utiliza Android Logcat, excepciones y stack traces cuando estén disponibles.
+- Investiga problemas relacionados con el ciclo de vida de actividades, fragmentos, navegación y conservación del estado.
+- Comprueba los permisos, almacenamiento, conectividad y compatibilidad con las versiones de Android pertinentes.
+- Ante errores de compilación, identifica la causa antes de modificar configuraciones de Gradle, SDK o dependencias.
+- Ante errores de red, distingue entre problemas de conexión, respuestas HTTP, parsing, autenticación y cambios en servicios externos.
+- Ante fallos de fuentes de manga, revisa por separado la búsqueda, obtención de metadatos, listado de capítulos y carga de imágenes.
+- Evita que un error de una fuente externa provoque fallos innecesarios en otras fuentes o en toda la aplicación.
+- Verifica que las correcciones no afecten las descargas, el lector, el historial ni la persistencia de datos.
+
+### Criterios para considerar un error resuelto
+
+- La causa raíz está identificada o existe una explicación sustentada en evidencias.
+- La corrección aborda el problema identificado.
+- Las pruebas pertinentes pasan, cuando pueden ejecutarse.
+- No se detectaron regresiones en las funcionalidades relacionadas durante las verificaciones realizadas.
+- Se documentan las comprobaciones que no pudieron realizarse y cualquier limitación pendiente.
 
 
 
@@ -100,7 +140,7 @@ Completa las tareas solicitadas de principio a fin. Prioriza trabajar y entregar
 
 
 
-\- No hay restricciones técnicas.
+\- No hay restricciones técnicas adicionales, pero conserva la compatibilidad, los datos del usuario, las credenciales y el sistema de firma y publicación existentes.
 
 ## Entrega de APK en GitHub
 

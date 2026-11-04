@@ -33,7 +33,7 @@
 - Escenario completo aprobado en el POCO X6 Pro 5G, Android 16, modo profile: ocho páginas verificadas, una sola petición adicional para reparar la página eliminada y WorkManager finalizado con SUCCEEDED después de cerrar el servicio de descargas.
 - Navegación: 193 fotogramas, construcción media 1.154 ms, rasterización media 3.308 ms; ningún fotograma excedió el presupuesto de construcción o rasterización informado por Flutter.
 - Apertura del lector de la muestra local: 555 ms. Memoria PSS del proceso completo (UI más motor del servicio): 254.0 → 260.5 MiB durante las doce transiciones. Es una muestra, no una prueba de ausencia de fugas a largo plazo.
-- Informe crudo: `build/integration_reports/poco-profile.json`. Registro: `build/integration-profile.log`. No hubo errores SQLite en la ejecución aprobada.
+- Informe crudo: `build/integration_reports/poco-profile.json`. Registro: `build/reports/logs/integration-profile.log`. No hubo errores SQLite en la ejecución aprobada.
 
 ## Datos y aislamiento
 

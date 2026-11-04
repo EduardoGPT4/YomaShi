@@ -40,7 +40,7 @@ El botón de autorización requiere además permitir el destino de la redirecci�
 
 Las pruebas de Flutter cubren búsquedas por nombre/ID/URL, estados, validación, cola sin conexión, reintentos, alias de capítulos locales y remotos, cambio de cuenta, respuestas antiguas, envíos concurrentes, capítulos especiales y backups sin credenciales. Las pruebas HTTP ejecutan los endpoints PHP con un proveedor MAL local: sesión, CSRF, PKCE, callback, cifrado, tokens de renovación rotativos, actualizaciones PATCH y límites de progreso. No modifican ninguna cuenta MAL real.
 
-La prueba de conexión real puede ejecutarse de forma voluntaria con `flutter test test/myanimelist_live_test.dart --dart-define=YOMASHI_LIVE_MAL=true`. Requiere PHP local para reproducir la operación AES del puente Android. Crea y revoca su propia conexión pendiente; no autoriza ninguna cuenta MAL ni modifica listas. Las pruebas habituales omiten esta petición externa.
+La prueba de conexión real puede ejecutarse de forma voluntaria con `flutter test test/live/myanimelist_live_test.dart --dart-define=YOMASHI_LIVE_MAL=true`. Requiere PHP local para reproducir la operación AES del puente Android. Crea y revoca su propia conexión pendiente; no autoriza ninguna cuenta MAL ni modifica listas. Las pruebas habituales omiten esta petición externa.
 
 La regresión del botón se prueba también en un perfil nuevo de Chrome: con Node.js, Playwright y Chrome disponibles, ejecutar `test/backend/test_myanimelist.py` con `YOMASHI_BROWSER_TESTS=1`. `PLAYWRIGHT_MODULE` permite indicar la ruta de Playwright si no está instalado en el proyecto. La prueba hace clic en el formulario y comprueba que Chromium solicita la navegación a MAL; una respuesta HTTP 303 por sí sola no detecta este fallo de CSP.
 

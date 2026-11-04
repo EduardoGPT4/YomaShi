@@ -75,6 +75,11 @@ flutter {
 
 dependencies {
     implementation("androidx.work:work-runtime-ktx:2.11.2")
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
+    implementation("com.google.mlkit:text-recognition-japanese:16.0.1")
+    implementation("com.google.mlkit:text-recognition-korean:16.0.1")
+    implementation("com.google.mlkit:translate:17.0.3")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 // Flutter 3.47.5 conserva plugins de desarrollo en el registrador Java de release,

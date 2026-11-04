@@ -7,12 +7,13 @@ import 'app_metrics.dart';
 /// Índices de la navegación inferior YomaShi 2.0.
 abstract final class YomashiNavIndex {
   static const int home = 0;
-  static const int offline = 1;
-  static const int downloads = 2;
-  static const int profile = 3;
+  static const int hitomi = 1;
+  static const int offline = 2;
+  static const int downloads = 3;
+  static const int profile = 4;
 }
 
-/// Bottom navigation: Inicio · Biblioteca · Descargas · Perfil.
+/// Bottom navigation: Inicio · +18 · Biblioteca · Descargas · Perfil.
 class YomashiBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -62,6 +63,11 @@ class YomashiBottomNavBar extends StatelessWidget {
               icon: Icon(Icons.home_outlined),
               selectedIcon: Icon(Icons.home_rounded),
               label: 'Inicio',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.eighteen_up_rating_outlined),
+              selectedIcon: Icon(Icons.eighteen_up_rating_rounded),
+              label: '+18',
             ),
             const NavigationDestination(
               icon: Icon(Icons.download_done_outlined),

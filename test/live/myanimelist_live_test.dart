@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yomashi/services/myanimelist_client.dart';
-import 'download_engine_regression_test.dart' show RealHttp;
-import 'myanimelist_test.dart' show MemoryCredential;
+import '../services/download_engine_regression_test.dart' show RealHttp;
+import '../widgets/myanimelist_test.dart' show MemoryCredential;
 
 // Opt-in: creates and revokes its own pending device connection on the real
 // backend. It does not authorize a MAL account or change anybody's manga list.

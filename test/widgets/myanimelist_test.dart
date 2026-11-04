@@ -12,7 +12,7 @@ import 'package:yomashi/screens/myanimelist_screen.dart';
 import 'package:yomashi/services/myanimelist_client.dart';
 import 'package:yomashi/services/myanimelist_service.dart';
 import 'package:yomashi/utils/backup_service.dart';
-import 'download_engine_regression_test.dart' show RealHttp;
+import '../services/download_engine_regression_test.dart' show RealHttp;
 
 class MemoryCredential extends MalCredentialStore {
   Map<String, dynamic>? value = {

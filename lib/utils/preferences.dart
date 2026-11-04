@@ -36,6 +36,7 @@ class PreferencesService {
   static const _keyMangaSourceLinks = 'manga_source_links_v1';
   static const _keyActiveMangaSource = 'active_manga_source_v1';
   static const _keyMangaDexLanguages = 'mangadex_languages_v1';
+  static const _keyHitomiLanguage = 'hitomi_language_v1';
   static const _keyProfileDisplayName = 'profile_display_name_v1';
   static const _keyProfileAvatarPath = 'profile_avatar_path_v1';
   static const _keyManageStorageExplained = 'manage_storage_explained_v1';
@@ -504,6 +505,17 @@ class PreferencesService {
   static Future<void> setMangaDexLanguages(List<String> codes) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_keyMangaDexLanguages, codes);
+  }
+
+  /// Idioma del apartado +18 (`spanish`, `english`, `all`, …).
+  static Future<String?> getHitomiLanguage() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyHitomiLanguage);
+  }
+
+  static Future<void> setHitomiLanguage(String code) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyHitomiLanguage, code);
   }
 
   /// Nombre de perfil (solo local, no cuenta remota).

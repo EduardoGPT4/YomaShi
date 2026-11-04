@@ -1,4 +1,4 @@
-// Optional visual inspection: flutter test test/ui_preview_test.dart
+// Optional visual inspection: flutter test test/widgets/ui_preview_test.dart
 // --dart-define=YOMASHI_UI_CAPTURE=true --update-goldens
 import 'dart:io';
 

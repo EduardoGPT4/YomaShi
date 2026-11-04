@@ -5,6 +5,7 @@ import '../models/manga_source.dart';
 import '../providers/source_provider.dart';
 import '../services/mangadex_service.dart';
 import '../widgets/home_content_layout.dart';
+import '../widgets/mangadex_language_sheet.dart';
 import '../widgets/section_header.dart';
 import '../widgets/sources_list_card.dart';
 
@@ -59,12 +60,12 @@ class SourcesScreen extends StatelessWidget {
             const SizedBox(height: HomeContentLayout.sectionSpacing),
             SectionHeader(
               icon: Icons.translate_rounded,
-              title: 'Idioma MangaDex',
+              title: 'Idiomas de MangaDex',
+              trailing: '${sources.mangaDexLanguages.length}',
             ),
             const SizedBox(height: 10),
             Text(
-              'Capítulos y catálogo en español. Elige España, Latino o ambos. '
-              'No se usa inglés.',
+              'Elige uno o varios idiomas para el catálogo, las búsquedas y los capítulos.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurface.withAlpha(170),
                 height: 1.4,
@@ -75,46 +76,57 @@ class SourcesScreen extends StatelessWidget {
             Wrap(
               spacing: 10,
               runSpacing: 10,
-              children: MangaDexLanguage.selectable.map((lang) {
-                final selected = sources.isMangaDexLanguageEnabled(lang.code);
-                return FilterChip(
-                  selected: selected,
-                  showCheckmark: true,
-                  label: Text(lang.label),
-                  selectedColor: theme.colorScheme.primary.withAlpha(48),
-                  checkmarkColor: theme.colorScheme.primary,
-                  labelStyle: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: selected
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurface.withAlpha(200),
-                  ),
-                  side: BorderSide(
-                    color: selected
-                        ? theme.colorScheme.primary.withAlpha(120)
-                        : theme.colorScheme.onSurface.withAlpha(28),
-                  ),
-                  onSelected: (_) async {
-                    final before = sources.mangaDexLanguages.length;
-                    await sources.toggleMangaDexLanguage(lang.code);
-                    if (!context.mounted) {
-                      return;
-                    }
-                    final after = sources.mangaDexLanguages.length;
-                    final blocked = selected && before == 1 && after == 1;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          blocked
-                              ? 'Debe quedar al menos un idioma.'
-                              : 'MangaDex: ${sources.mangaDexLanguages.map(_langLabel).join(' · ')}',
-                        ),
-                        duration: const Duration(seconds: 2),
-                      ),
+              children: MangaDexLanguage.selectable
+                  .where((lang) => sources.isMangaDexLanguageEnabled(lang.code))
+                  .map((lang) {
+                    final selected = sources.isMangaDexLanguageEnabled(
+                      lang.code,
                     );
-                  },
-                );
-              }).toList(),
+                    return FilterChip(
+                      selected: selected,
+                      showCheckmark: true,
+                      label: Text(lang.label),
+                      selectedColor: theme.colorScheme.primary.withAlpha(48),
+                      checkmarkColor: theme.colorScheme.primary,
+                      labelStyle: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: selected
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurface.withAlpha(200),
+                      ),
+                      side: BorderSide(
+                        color: selected
+                            ? theme.colorScheme.primary.withAlpha(120)
+                            : theme.colorScheme.onSurface.withAlpha(28),
+                      ),
+                      onSelected: (_) async {
+                        final before = sources.mangaDexLanguages.length;
+                        await sources.toggleMangaDexLanguage(lang.code);
+                        if (!context.mounted) {
+                          return;
+                        }
+                        final after = sources.mangaDexLanguages.length;
+                        final blocked = selected && before == 1 && after == 1;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              blocked
+                                  ? 'Debe quedar al menos un idioma.'
+                                  : 'MangaDex: ${sources.mangaDexLanguages.map(_langLabel).join(' · ')}',
+                            ),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    );
+                  })
+                  .toList(),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.translate_rounded),
+              label: const Text('Elegir idiomas'),
+              onPressed: () => MangaDexLanguageSheet.show(context, sources),
             ),
           ],
           const SizedBox(height: HomeContentLayout.sectionSpacing),

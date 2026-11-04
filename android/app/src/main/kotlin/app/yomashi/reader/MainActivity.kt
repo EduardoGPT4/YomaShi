@@ -10,9 +10,11 @@ class MainActivity : FlutterActivity() {
     private var volumeEnabled = false
     private var volumeChannel: MethodChannel? = null
     private var downloads: MethodChannel? = null
+    private var translation: ReaderTranslationPlatform? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        translation = ReaderTranslationPlatform(this, flutterEngine.dartExecutor.binaryMessenger)
         DownloadHostService.storageChannel(flutterEngine,this)
         downloads = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.yomashi.reader/downloads")
         DownloadHostService.observe(downloads)
@@ -32,6 +34,8 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        translation?.close()
+        translation = null
         DownloadHostService.observe(null)
         downloads?.setMethodCallHandler(null)
         volumeChannel?.setMethodCallHandler(null)

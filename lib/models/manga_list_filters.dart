@@ -18,6 +18,9 @@ class MangaListFilters {
   final ReadingStatusFilter readingStatus;
   final MangaSortOption sort;
 
+  /// En Hitomi, muestra bajo el buscador las etiquetas con más galerías.
+  final bool showPopularTags;
+
   const MangaListFilters({
     this.favoritesOnly = false,
     this.categoryId,
@@ -26,6 +29,7 @@ class MangaListFilters {
     this.inProgressOnly = false,
     this.readingStatus = ReadingStatusFilter.all,
     this.sort = MangaSortOption.catalog,
+    this.showPopularTags = false,
   });
 
   static const MangaListFilters empty = MangaListFilters();
@@ -37,7 +41,8 @@ class MangaListFilters {
         (type != null && type!.isNotEmpty) ||
         inProgressOnly ||
         readingStatus != ReadingStatusFilter.all ||
-        sort != MangaSortOption.catalog;
+        sort != MangaSortOption.catalog ||
+        showPopularTags;
   }
 
   MangaListFilters copyWith({
@@ -51,6 +56,7 @@ class MangaListFilters {
     bool? inProgressOnly,
     ReadingStatusFilter? readingStatus,
     MangaSortOption? sort,
+    bool? showPopularTags,
   }) {
     return MangaListFilters(
       favoritesOnly: favoritesOnly ?? this.favoritesOnly,
@@ -60,6 +66,7 @@ class MangaListFilters {
       inProgressOnly: inProgressOnly ?? this.inProgressOnly,
       readingStatus: readingStatus ?? this.readingStatus,
       sort: sort ?? this.sort,
+      showPopularTags: showPopularTags ?? this.showPopularTags,
     );
   }
 }

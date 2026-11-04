@@ -41,7 +41,7 @@ class MangaSources {
       name: 'MangaDex',
       subtitle: 'Catálogo global con API oficial',
       kind: MangaSourceKind.api,
-      languageLabel: 'Español (España / Latino)',
+      languageLabel: 'Varios idiomas · Seleccionables',
       implemented: true,
       icon: Icons.menu_book_rounded,
     ),
@@ -83,6 +83,17 @@ class MangaSources {
     ),
   ];
 
+  /// No forma parte de [all]: el apartado +18 no es una fuente del catálogo normal.
+  static const MangaSource hitomi = MangaSource(
+    id: 'hitomi',
+    name: 'Hitomi.la',
+    subtitle: 'Galerías +18',
+    kind: MangaSourceKind.scraping,
+    languageLabel: 'Varios idiomas',
+    implemented: true,
+    icon: Icons.eighteen_up_rating_rounded,
+  );
+
   static String shortLabel(String id) {
     switch (id) {
       case 'lectortmo':
@@ -97,12 +108,15 @@ class MangaSources {
       case 'manhwaweb':
       case 'yupmanga':
         return 'ManhwaWeb';
+      case 'hitomi':
+        return 'Hitomi.la';
       default:
         return id;
     }
   }
 
   static MangaSource byId(String id) {
+    if (id == 'hitomi') return hitomi;
     final normalized = id == 'yupmanga' ? 'manhwaweb' : id;
     for (final source in all) {
       if (source.id == normalized) {
