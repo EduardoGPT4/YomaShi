@@ -21,7 +21,7 @@ Cada fuente tiene indicador de carga, resultados, aviso sin coincidencias y rein
 
 Las 22 pruebas nuevas de Flutter pasan: listas y paginación, estados permitidos, títulos y alias, cancelación, aislamiento de cuentas, errores independientes y navegación. Las pantallas se revisaron con capturas, texto grande y un ancho de 320 píxeles. El análisis estático no encuentra incidencias.
 
-La batería completa obtiene **229 pruebas correctas, 11 fallos existentes y tres capturas opcionales omitidas**. Los once fallos siguen relacionados con etiquetas ausentes en la configuración personalizada de exclusiones conservada por petición del usuario; no se eliminaron ni desactivaron las pruebas.
+La batería completa obtiene **229 pruebas correctas, 11 fallos existentes y tres pruebas opcionales omitidas**: dos consultas a servicios reales y una captura de interfaz. Los once fallos siguen relacionados con etiquetas ausentes en la configuración personalizada de exclusiones conservada por petición del usuario; no se eliminaron ni desactivaron las pruebas.
 
 El contrato HTTP del servidor ejecuta ocho pruebas: **siete correctas y una prueba opcional de navegador omitida**. Usa PHP y un proveedor MAL local simulado, sin leer credenciales ni modificar cuentas reales. También se comprueba que instalar la extensión dos veces produce el mismo código y que únicamente cambian el módulo YomaShi y la ruta de lectura de manga en el adaptador MAL del alojamiento.
 
