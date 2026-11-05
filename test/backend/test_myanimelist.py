@@ -13,12 +13,15 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 class Fixture(BaseHTTPRequestHandler):
     records=[];patches=[];chapters=0;status='plan_to_read';token_calls=0
     profile={'id':7,'name':'MangaTester','picture':'https://cdn.myanimelist.net/images/userimages/7.jpg'};profile_status=200;token_status=200;token_error='server_error'
+    library_payload=None;library_status=200
     def log_message(self,*args):pass
     def respond(self,data,status=200):
         raw=json.dumps(data).encode();self.send_response(status);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
     def do_GET(self):
         type(self).records.append(('GET',self.path))
         if self.path=='/profile':return self.respond(self.profile,self.profile_status)
+        if self.path.startswith('/manga-list?'):
+            return self.respond(self.library_payload if self.library_payload is not None else {'data':[], 'paging':{}},self.library_status)
         node={'id':2,'title':'Berserk fixture','num_chapters':100,'status':'finished','main_picture':{},'my_list_status':{'status':self.status,'num_chapters_read':self.chapters}}
         if self.path.startswith('/manga-search?'):return self.respond({'data':[{'node':node}]})
         if self.path.startswith('/manga:2?'):return self.respond(node)
@@ -45,6 +48,7 @@ class TestMangaBridge(unittest.TestCase):
         Fixture.profile={'id':7,'name':'MangaTester','picture':'https://cdn.myanimelist.net/images/userimages/7.jpg'}
         Fixture.profile_status=200
         Fixture.token_status=200;Fixture.token_error='server_error'
+        Fixture.library_payload=None;Fixture.library_status=200
     @classmethod
     def setUpClass(cls):
         cls.temp=tempfile.TemporaryDirectory(prefix='yomashi-mal-');cls.folder=Path(cls.temp.name)
@@ -174,6 +178,53 @@ class TestMangaBridge(unittest.TestCase):
         data=json.loads(result.stdout.strip().splitlines()[-1])
         self.assertTrue(data['destination_requested'])
         self.assertEqual(data['form_post_status'],303)
+    def test_manga_library_filters_private_statuses_and_paginates_without_following_urls(self):
+        pair=self.connect_fixture();token=pair['device_token']
+        node={'id':1,'title':'Obra principal','num_chapters':20,'status':'finished',
+              'main_picture':{'medium':'https://cdn.myanimelist.net/images/manga/1/1.jpg'},
+              'alternative_titles':{'en':'English Title','ja':'別題','synonyms':['Alias','English Title']},
+              'my_list_status':{'status':'completed','num_chapters_read':20}}
+        before=len(Fixture.patches)
+        for state in ['reading','plan_to_read']:
+            Fixture.library_payload={'data':[
+                {'node':node,'list_status':{'status':state,'num_chapters_read':3}},
+                {'node':{**node,'id':2},'list_status':{'status':'completed','num_chapters_read':20}},
+            ],'paging':{'next':'https://untrusted.example/do-not-follow'}}
+            code,raw,_=self.request(payload={'action':'library','status':state,'limit':2,'owner_id':7},token=token)
+            self.assertEqual(code,200,raw);page=json.loads(raw)
+            self.assertEqual(page['next_offset'],2);self.assertEqual(len(page['items']),1)
+            manga=page['items'][0];self.assertEqual(manga['status'],state);self.assertEqual(manga['chapters_read'],3)
+            self.assertEqual(manga['alternative_titles'],['English Title','別題','Alias'])
+            self.assertNotIn(b'fixture-access-token',raw);self.assertNotIn(b'fixture-refresh-token',raw)
+            path=next(path for method,path in reversed(Fixture.records) if path.startswith('/manga-list?'))
+            query=urllib.parse.parse_qs(urllib.parse.urlparse(path).query)
+            self.assertEqual(query['status'],[state]);self.assertEqual(query['sort'],['manga_title'])
+            self.assertEqual(query['limit'],['2']);self.assertIn('list_status',query['fields'][0])
+            Fixture.library_payload={'data':[{'node':{**node,'id':3},'list_status':{'status':state,'num_chapters_read':0}}],'paging':{}}
+            code,raw,_=self.request(payload={'action':'library','status':state,'offset':2,'owner_id':7},token=token)
+            self.assertEqual(code,200,raw);self.assertIsNone(json.loads(raw)['next_offset'])
+        self.assertEqual(len(Fixture.patches),before)
+
+    def test_manga_library_rejects_invalid_filters_and_wrong_owner_before_refresh(self):
+        pair=self.connect_fixture();token=pair['device_token'];before=Fixture.token_calls
+        for invalid in [{'status':'completed'},{'status':'watching'},{'status':'all'},{'offset':-1},{'offset':'1'},{'limit':0},{'limit':101}]:
+            code,raw,_=self.request(payload={'action':'library','status':'reading',**invalid},token=token)
+            self.assertEqual(code,422,raw)
+        code,raw,_=self.request(payload={'action':'library','status':'reading','owner_id':8},token=token)
+        self.assertEqual(code,409,raw);self.assertEqual(Fixture.token_calls,before)
+        self.assertEqual(self.request(payload={'action':'library','status':'reading'})[0],401)
+        code,raw,_=self.request(payload={'action':'start'});pending=json.loads(raw)
+        self.assertEqual(self.request(payload={'action':'library','status':'reading'},token=pending['device_token'])[0],409)
+
+    def test_manga_library_rejects_incomplete_pages_and_preserves_provider_failures(self):
+        pair=self.connect_fixture();token=pair['device_token']
+        for malformed in [{'data':None},{'data':[],'paging':{'next':'https://api.myanimelist.net/next'}},{'data':[{'node':{'id':1}}]}]:
+            Fixture.library_payload=malformed
+            code,raw,_=self.request(payload={'action':'library','status':'reading'},token=token)
+            self.assertEqual(code,502,raw)
+        Fixture.library_status=429
+        self.assertEqual(self.request(payload={'action':'library','status':'reading'},token=token)[0],429)
+
     def test_complete_manga_authorization_and_updates(self):
         code,raw,_=self.request(payload={'action':'start'});self.assertEqual(code,200,raw)
         pair=json.loads(raw);token=pair['device_token'];device=pair['device_id']

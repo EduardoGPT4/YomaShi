@@ -82,6 +82,8 @@ class MalPlatform extends MalCredentialStore {
 class MalManga {
   final int id, chaptersRead, totalChapters;
   final String title, status, publishingStatus;
+  final String? picture;
+  final List<String> alternativeTitles;
   const MalManga({
     required this.id,
     required this.title,
@@ -89,6 +91,8 @@ class MalManga {
     required this.totalChapters,
     required this.status,
     required this.publishingStatus,
+    this.picture,
+    this.alternativeTitles = const [],
   });
   factory MalManga.fromMap(Map<String, dynamic> m) => MalManga(
     id: m['id'] as int,
@@ -97,7 +101,20 @@ class MalManga {
     totalChapters: m['num_chapters'] as int,
     status: m['status'] as String,
     publishingStatus: m['publishing_status'] as String? ?? '',
+    picture: m['picture'] as String?,
+    alternativeTitles:
+        (m['alternative_titles'] as List?)
+            ?.whereType<String>()
+            .where((title) => title.trim().isNotEmpty)
+            .toList() ??
+        const [],
   );
+}
+
+class MalMangaPage {
+  final List<MalManga> items;
+  final int? nextOffset;
+  const MalMangaPage({required this.items, this.nextOffset});
 }
 
 class MyAnimeListClient {
@@ -383,6 +400,57 @@ class MyAnimeListClient {
     return (data['items'] as List)
         .map((m) => MalManga.fromMap(Map<String, dynamic>.from(m as Map)))
         .toList();
+  }
+
+  static const libraryStatuses = ['reading', 'plan_to_read'];
+
+  Future<MalMangaPage> library({
+    required String status,
+    int offset = 0,
+    int limit = 50,
+    int? expectedOwner,
+  }) async {
+    if (!libraryStatuses.contains(status) ||
+        offset < 0 ||
+        offset > 1000000 ||
+        limit < 1 ||
+        limit > 100) {
+      throw const MalFailure('Filtro o página de la lista MAL inválidos.', 400);
+    }
+    final auth = await credentials.load();
+    final owner = (auth?['profile'] as Map?)?['id'];
+    if (auth?['connected'] != true || owner is! int || owner <= 0) {
+      throw const MalFailure(
+        'Vincula una cuenta de MyAnimeList para ver tus mangas.',
+        401,
+      );
+    }
+    final data = await request({
+      'action': 'library',
+      'status': status,
+      'offset': offset,
+      'limit': limit,
+    }, expectedOwner: expectedOwner ?? owner);
+    final rows = data['items'];
+    final next = data['next_offset'];
+    if (rows is! List ||
+        rows.length > limit ||
+        (next != null &&
+            (next is! int ||
+                next <= offset ||
+                next > 1000000 ||
+                rows.isEmpty))) {
+      throw const MalFailure('La lista MAL devolvió una página inválida.', 502);
+    }
+    try {
+      final items = rows
+          .map((row) => MalManga.fromMap(Map<String, dynamic>.from(row as Map)))
+          .where((manga) => manga.status == status)
+          .toList();
+      return MalMangaPage(items: items, nextOffset: next as int?);
+    } catch (_) {
+      throw const MalFailure('La lista MAL contiene datos inválidos.', 502);
+    }
   }
 
   Future<MalManga> detail(int id) async => MalManga.fromMap(

@@ -22,8 +22,13 @@ import 'myanimelist_screen.dart';
 
 class OnlineMangaDetailScreen extends StatefulWidget {
   final String mangaUrl;
+  final String? sourceId;
 
-  const OnlineMangaDetailScreen({super.key, required this.mangaUrl});
+  const OnlineMangaDetailScreen({
+    super.key,
+    required this.mangaUrl,
+    this.sourceId,
+  });
 
   @override
   State<OnlineMangaDetailScreen> createState() =>
@@ -42,7 +47,10 @@ class _OnlineMangaDetailScreenState extends State<OnlineMangaDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _detailFuture = OnlineCatalogService.fetchMangaDetail(widget.mangaUrl);
+    _detailFuture = OnlineCatalogService.fetchMangaDetail(
+      widget.mangaUrl,
+      sourceId: widget.sourceId,
+    );
     _detailFuture.then((detail) {
       if (mounted) unawaited(_refreshDownloadStates(detail));
     }, onError: (Object _) {});
@@ -390,6 +398,7 @@ class _OnlineMangaDetailScreenState extends State<OnlineMangaDetailScreen> {
                 setState(() {
                   _detailFuture = OnlineCatalogService.fetchMangaDetail(
                     widget.mangaUrl,
+                    sourceId: widget.sourceId,
                   );
                 });
               },

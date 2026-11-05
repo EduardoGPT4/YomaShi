@@ -82,10 +82,31 @@ function ys_normalize(array $m): array {
   $id=ys_id($m['id']??null);$title=$m['title']??null;
   if(!is_string($title) || $title==='') throw new MalRemoteError(502);
   $state=$m['my_list_status']??[];
-  return ['id'=>$id,'title'=>$title,'picture'=>(string)($m['main_picture']['medium']??''),'num_chapters'=>(int)($m['num_chapters']??0),'publishing_status'=>(string)($m['status']??''),'status'=>in_array($state['status']??'',YS_STATUSES,true)?$state['status']:'plan_to_read','chapters_read'=>max(0,(int)($state['num_chapters_read']??0))];
+  $alternatives=$m['alternative_titles']??[];$titles=[];
+  if(is_array($alternatives)) {
+    foreach([$alternatives['en']??'', $alternatives['ja']??'', ...(is_array($alternatives['synonyms']??null)?$alternatives['synonyms']:[])] as $name) {
+      if(is_string($name) && trim($name)!=='' && strlen($name)<=300) $titles[]=trim($name);
+    }
+  }
+  return ['id'=>$id,'title'=>$title,'picture'=>ys_profile_picture($m['main_picture']['medium']??''),'alternative_titles'=>array_slice(array_values(array_unique($titles)),0,16),'num_chapters'=>(int)($m['num_chapters']??0),'publishing_status'=>(string)($m['status']??''),'status'=>in_array($state['status']??'',YS_STATUSES,true)?$state['status']:'plan_to_read','chapters_read'=>max(0,(int)($state['num_chapters_read']??0))];
 }
 function ys_manga(string $token,int $id): array {
-  return ys_normalize(mal_http('manga:'.$id,['fields'=>'id,title,main_picture,num_chapters,status,my_list_status{status,num_chapters_read}'],$token));
+  return ys_normalize(mal_http('manga:'.$id,['fields'=>'id,title,main_picture,num_chapters,status,alternative_titles,my_list_status{status,num_chapters_read}'],$token));
+}
+function ys_library(string $token,array $input): array {
+  $status=$input['status'];$offset=$input['offset']??0;$limit=$input['limit']??50;
+  $response=mal_http('manga-list',['status'=>$status,'offset'=>$offset,'limit'=>$limit,'sort'=>'manga_title','fields'=>'id,title,main_picture,num_chapters,status,alternative_titles,list_status'],$token);
+  $rows=$response['data']??null;
+  if(!is_array($rows) || count($rows)>$limit) throw new MalRemoteError(502);
+  $items=[];
+  foreach($rows as $row) {
+    if(!is_array($row) || !is_array($row['node']??null) || !is_array($row['list_status']??null) || !in_array($row['list_status']['status']??'',YS_STATUSES,true)) throw new MalRemoteError(502);
+    if($row['list_status']['status']!==$status) continue;
+    $node=$row['node'];$node['my_list_status']=$row['list_status'];$items[]=ys_normalize($node);
+  }
+  $hasNext=is_string($response['paging']['next']??null) && $response['paging']['next']!=='';
+  if($hasNext && count($rows)===0) throw new MalRemoteError(502);
+  return ['items'=>$items,'next_offset'=>$hasNext?$offset+count($rows):null];
 }
 function ys_access_tokens(PDO $db,array $row,array $tokens,bool &$refreshed): array {
   if(($tokens['expires_at']??0)<time()+60) {
@@ -129,7 +150,8 @@ function ys_dispatch(PDO $db,array $input,string $bearer): array {
   if($action==='start') return ys_start($db);
   if(!preg_match('/^[a-f0-9]{64}$/D',$bearer)) throw new WebError('Conecta tu cuenta de MyAnimeList.',401);
   // Reject bad inputs before a possible OAuth refresh with rotating credentials.
-  if(!in_array($action,['status','disconnect','search','detail','update'],true)) throw new WebError('Operación no disponible.',404);
+  if(!in_array($action,['status','disconnect','search','detail','update','library'],true)) throw new WebError('Operación no disponible.',404);
+  if($action==='library' && (!in_array($input['status']??null,['reading','plan_to_read'],true) || !is_int($input['offset']??0) || ($input['offset']??0)<0 || ($input['offset']??0)>1000000 || !is_int($input['limit']??50) || ($input['limit']??50)<1 || ($input['limit']??50)>100)) throw new WebError('Filtro o página de la lista MAL inválidos.');
   if($action==='search' && (!is_string($input['query']??null) || strlen(trim($input['query']))<3 || strlen(trim($input['query']))>192)) throw new WebError('Escribe al menos tres caracteres o usa el ID.');
   if(in_array($action,['detail','update'],true)) ys_id($input['id']??null);
   if($action==='update' && (!is_int($input['chapters_read']??null) || $input['chapters_read']<0 || $input['chapters_read']>100000 || !in_array($input['status']??null,YS_STATUSES,true))) throw new WebError('Capítulos o estado inválidos.');
@@ -151,7 +173,8 @@ function ys_dispatch(PDO $db,array $input,string $bearer): array {
       if(strlen($q)<3 || strlen($q)>192) throw new WebError('Escribe al menos tres caracteres o usa el ID.');
       $results=mal_http('manga-search',['q'=>$q,'limit'=>10,'fields'=>'id,title,main_picture,num_chapters,status,my_list_status{status,num_chapters_read}'],$token);
       $result=['items'=>array_map(fn($e)=>ys_normalize($e['node']),$results['data']??[])];
-    } elseif($action==='detail') $result=['manga'=>ys_manga($token,ys_id($input['id']??null))];
+    } elseif($action==='library') $result=ys_library($token,$input);
+    elseif($action==='detail') $result=['manga'=>ys_manga($token,ys_id($input['id']??null))];
     elseif($action==='update') {
       $id=ys_id($input['id']??null);$chapters=$input['chapters_read']??null;$status=$input['status']??null;
       if(!is_int($chapters) || $chapters<0 || $chapters>100000 || !in_array($status,YS_STATUSES,true)) throw new WebError('Capítulos o estado inválidos.');

@@ -480,6 +480,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
+                  '• Mangas MAL: tus listas Leyendo y Por leer.\n'
+                  '• Coincidencias exactas en varias fuentes desde cada manga de MAL.\n'
                   '• Apartado +18 Hitomi.la, separado de los mangas normales.\n'
                   '• Más idiomas en MangaDex, con búsqueda y selección múltiple.\n'
                   '• Filtros de contenido aplicados al catálogo y al buscador.\n'

@@ -10,6 +10,7 @@
 
 ## Historial de cambios
 
+- [Versión 2.8: biblioteca MAL y coincidencias entre fuentes](releases/MEJORAS_2_8.md).
 - [Versión 2.7.1: entrega personal y estado de las comprobaciones](releases/MEJORAS_2_7_1.md).
 - [Implementación del informe original](releases/IMPLEMENTACION.md).
 - [Versión 2.2: funciones y verificación](releases/MEJORAS_2_2.md).

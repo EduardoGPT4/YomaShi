@@ -38,6 +38,10 @@ def install(web: Path):
     $allowed[$endpoint]='https://api.myanimelist.net/v2/manga/'.$match[1].'/my_list_status';
   } else"""
         text=text[:index]+prefix+text[index+2:]
+    if "'manga-list'" not in text:
+        anchor="'manga-search' => 'https://api.myanimelist.net/v2/manga',"
+        if text.count(anchor)!=1: raise RuntimeError('Review the manga search route before adding the manga list')
+        text=text.replace(anchor,anchor+"\n    'manga-list' => 'https://api.myanimelist.net/v2/users/@me/mangalist',")
     patches[http]=text
     publisher=web/'release.py'
     text=publisher.read_text(encoding='utf-8-sig')

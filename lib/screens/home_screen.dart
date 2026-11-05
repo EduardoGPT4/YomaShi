@@ -3,12 +3,17 @@ import 'package:provider/provider.dart';
 
 import '../models/manga_source.dart';
 import '../providers/library_provider.dart';
+import '../providers/profile_provider.dart';
 import '../providers/source_provider.dart';
+import '../services/myanimelist_client.dart';
+import '../services/myanimelist_service.dart';
+import 'mal_library_screen.dart';
 import 'online_browser_screen.dart';
 import 'sources_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final MyAnimeListClient? malClient;
+  const HomeScreen({super.key, this.malClient});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -20,80 +25,82 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildSourceUnavailable(ThemeData theme, SourceProvider source) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 28),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: theme.colorScheme.onSurface.withAlpha(18),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 28),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: theme.colorScheme.onSurface.withAlpha(18),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(50),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(50),
-                blurRadius: 14,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withAlpha(36),
-                  shape: BoxShape.circle,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withAlpha(36),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    source.active.icon,
+                    size: 32,
+                    color: theme.colorScheme.primary,
+                  ),
                 ),
-                child: Icon(
-                  source.active.icon,
-                  size: 32,
-                  color: theme.colorScheme.primary,
+                const SizedBox(height: 14),
+                Text(
+                  source.active.name,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                source.active.name,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.3,
+                const SizedBox(height: 8),
+                Text(
+                  'Esta fuente está seleccionada pero aún no tiene conector. '
+                  'Cambia a MangaDex, InManga, ManhwaWeb o Lectortmo en Fuentes.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withAlpha(170),
+                    height: 1.4,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Esta fuente está seleccionada pero aún no tiene conector. '
-                'Cambia a MangaDex, InManga, ManhwaWeb o Lectortmo en Fuentes.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withAlpha(170),
-                  height: 1.4,
-                  fontWeight: FontWeight.w600,
+                const SizedBox(height: 18),
+                Text(
+                  source.active.detailLine,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 18),
-              Text(
-                source.active.detailLine,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.w800,
+                const SizedBox(height: 18),
+                FilledButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const SourcesScreen()),
+                    );
+                  },
+                  icon: const Icon(Icons.hub_rounded),
+                  label: const Text('Elegir fuente'),
                 ),
-              ),
-              const SizedBox(height: 18),
-              FilledButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SourcesScreen()),
-                  );
-                },
-                icon: const Icon(Icons.hub_rounded),
-                label: const Text('Elegir fuente'),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -267,6 +274,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final theme = Theme.of(context);
     final library = context.watch<LibraryProvider>();
     final source = context.watch<SourceProvider>();
+    final linked = context.watch<ProfileProvider>().usesMyAnimeListIdentity;
+    final actionHeight =
+        48 * (MediaQuery.textScalerOf(context).scale(14) / 14).clamp(1.0, 2.0);
 
     return Scaffold(
       appBar: AppBar(
@@ -277,16 +287,78 @@ class _HomeScreenState extends State<HomeScreen> {
           child: const Text('YomaShi'),
         ),
         centerTitle: false,
+        bottom: linked
+            ? PreferredSize(
+                preferredSize: Size.fromHeight(actionHeight + 16),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                  child: SizedBox(
+                    height: actionHeight,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox.expand(
+                              child: _SourceChip(
+                                source: source.isLoaded ? source.active : null,
+                                onTap: _openSources,
+                                shortLabel: true,
+                                maxLabelWidth:
+                                    ((constraints.maxWidth - 8) / 2 - 66)
+                                        .clamp(20.0, 118.0)
+                                        .toDouble(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: SizedBox.expand(
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 8,
+                                  ),
+                                ),
+                                icon: const Icon(
+                                  Icons.bookmarks_outlined,
+                                  size: 18,
+                                ),
+                                label: const Text(
+                                  'Mangas MAL',
+                                  maxLines: 2,
+                                  textAlign: TextAlign.center,
+                                ),
+                                onPressed: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => MalLibraryScreen(
+                                      client:
+                                          widget.malClient ??
+                                          MyAnimeListService.shared.client,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            : null,
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 2),
-            child: Center(
-              child: _SourceChip(
-                source: source.isLoaded ? source.active : null,
-                onTap: _openSources,
+          if (!linked)
+            Padding(
+              padding: const EdgeInsets.only(right: 2),
+              child: Center(
+                child: _SourceChip(
+                  source: source.isLoaded ? source.active : null,
+                  onTap: _openSources,
+                ),
               ),
             ),
-          ),
           IconButton(
             tooltip: 'Recargar catálogo',
             onPressed: source.isLoaded
@@ -310,14 +382,23 @@ class _HomeScreenState extends State<HomeScreen> {
 class _SourceChip extends StatelessWidget {
   final MangaSource? source;
   final VoidCallback onTap;
+  final double maxLabelWidth;
+  final bool shortLabel;
 
-  const _SourceChip({required this.source, required this.onTap});
+  const _SourceChip({
+    required this.source,
+    required this.onTap,
+    this.maxLabelWidth = 118,
+    this.shortLabel = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loaded = source != null;
-    final label = loaded ? source!.name : '…';
+    final label = loaded
+        ? (shortLabel ? MangaSources.shortLabel(source!.id) : source!.name)
+        : '…';
 
     return Tooltip(
       message: 'Cambiar fuente',
@@ -352,7 +433,7 @@ class _SourceChip extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 118),
+                    constraints: BoxConstraints(maxWidth: maxLabelWidth),
                     child: Text(
                       label,
                       maxLines: 1,
