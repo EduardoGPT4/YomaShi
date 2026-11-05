@@ -287,9 +287,9 @@ class InMangaService {
           anchor.querySelector('h4.m0') ??
           anchor.querySelector('h4.ellipsed-text') ??
           anchor.querySelector('h4');
-      final title = TitleSanitizer.clean(
-        titleEl?.text.replaceAll(RegExp(r'\s+'), ' ').trim() ?? 'Manga',
-      );
+      final originalTitle =
+          titleEl?.text.replaceAll(RegExp(r'\s+'), ' ').trim() ?? 'Manga';
+      final title = TitleSanitizer.clean(originalTitle);
 
       final img = anchor.querySelector('img');
       final coverUrl = selectCoverUrl(
@@ -314,6 +314,7 @@ class InMangaService {
       results.add(
         OnlineMangaSummary(
           title: title.isEmpty ? 'Manga' : title,
+          originalTitle: originalTitle,
           url: url,
           coverUrl: coverUrl,
           type: null,
@@ -333,12 +334,13 @@ class InMangaService {
         if (mangaId == null || !seen.add(mangaId)) {
           continue;
         }
-        final title = TitleSanitizer.clean(
-          anchor.querySelector('h4')?.text.trim() ?? 'Manga',
-        );
+        final originalTitle =
+            anchor.querySelector('h4')?.text.trim() ?? 'Manga';
+        final title = TitleSanitizer.clean(originalTitle);
         results.add(
           OnlineMangaSummary(
             title: title,
+            originalTitle: originalTitle,
             url: url,
             coverUrl: thumbnailUrl(mangaId),
             type: null,

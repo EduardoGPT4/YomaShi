@@ -39,6 +39,7 @@ void main() {
   late HttpClient raw;
   var largeFeed = false;
   var multilingualFeed = false;
+  String? catalogTitle;
   final requestedUris = <Uri>[];
   setUpAll(() async {
     raw = HttpOverrides.runWithHttpOverrides(() => HttpClient(), RealHttp());
@@ -123,7 +124,19 @@ void main() {
           ],
         };
       } else if (path == '/manga') {
-        body = {'data': [], 'total': 24};
+        body = {
+          'data': [
+            if (catalogTitle != null)
+              {
+                'id': mangaId,
+                'attributes': {
+                  'title': {'es': catalogTitle},
+                },
+                'relationships': [],
+              },
+          ],
+          'total': 24,
+        };
       } else if (path.startsWith('/ver/manga/')) {
         request.response.statusCode = 503;
         body = 'Temporary failure';
@@ -197,6 +210,7 @@ void main() {
 
   setUp(() {
     requestedUris.clear();
+    catalogTitle = null;
     multilingualFeed = false;
     MangaDexService.setPreferredLanguages(MangaDexLanguage.defaultCodes);
   });
@@ -254,6 +268,20 @@ void main() {
       expect(detail.chapters.single.language, 'es');
     },
   );
+  test(
+    'catalog keeps the original title for exact matching despite display cleanup',
+    () async {
+      catalogTitle = 'Probe - 2';
+      final page = await MangaDexService.fetchCatalogPage(postsPerPage: 12);
+      expect(page.items.single.title, 'Probe');
+      expect(page.items.single.originalTitle, 'Probe - 2');
+      expect(
+        page.items.single.copyWith(sourceId: 'mangadex').originalTitle,
+        'Probe - 2',
+      );
+    },
+  );
+
   test('MangaDex exact page count', () async {
     final page = await MangaDexService.fetchCatalogPage(postsPerPage: 12);
     expect(page.totalPages, 2);

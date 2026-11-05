@@ -4,6 +4,9 @@ import 'content_identity.dart';
 
 class OnlineMangaSummary {
   final String title;
+
+  /// Título de la fuente antes de limpiar metadatos para la presentación.
+  final String? originalTitle;
   final String url;
   final String? coverUrl;
   final String? description;
@@ -18,6 +21,7 @@ class OnlineMangaSummary {
   const OnlineMangaSummary({
     required this.title,
     required this.url,
+    this.originalTitle,
     this.coverUrl,
     this.description,
     this.chapterCount,
@@ -29,6 +33,7 @@ class OnlineMangaSummary {
 
   Map<String, dynamic> toMap() => {
     'title': title,
+    'originalTitle': originalTitle,
     'url': url,
     'coverUrl': coverUrl,
     'description': description,
@@ -41,6 +46,7 @@ class OnlineMangaSummary {
   factory OnlineMangaSummary.fromMap(Map<String, dynamic> map) =>
       OnlineMangaSummary(
         title: map['title'] as String? ?? 'Manga',
+        originalTitle: map['originalTitle'] as String?,
         url: map['url'] as String? ?? '',
         coverUrl: map['coverUrl'] as String?,
         description: map['description'] as String?,
@@ -54,6 +60,7 @@ class OnlineMangaSummary {
   OnlineMangaSummary copyWith({String? sourceId}) {
     return OnlineMangaSummary(
       title: title,
+      originalTitle: originalTitle,
       url: url,
       coverUrl: coverUrl,
       description: description,

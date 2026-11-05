@@ -609,9 +609,8 @@ class MangaDexService {
     }
     final attributes = entity['attributes'] as Map<String, dynamic>? ?? {};
     final relationships = entity['relationships'] as List<dynamic>? ?? [];
-    final title = TitleSanitizer.clean(
-      _localizedString(attributes['title']) ?? 'Manga',
-    );
+    final originalTitle = _localizedString(attributes['title']) ?? 'Manga';
+    final title = TitleSanitizer.clean(originalTitle);
     final description = _localizedString(attributes['description']);
     final status = attributes['status']?.toString();
     final coverFile = _coverFileName(relationships);
@@ -622,6 +621,7 @@ class MangaDexService {
 
     return OnlineMangaSummary(
       title: title,
+      originalTitle: originalTitle,
       url: mangaSiteUrl(id),
       coverUrl: coverUrl,
       description: description,

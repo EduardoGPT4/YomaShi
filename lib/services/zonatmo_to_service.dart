@@ -344,6 +344,7 @@ class ZonatmoToService {
       results.add(
         OnlineMangaSummary(
           title: TitleSanitizer.clean(title),
+          originalTitle: title,
           url: '$baseUrl/manga/$slug',
           coverUrl: _coverUrl(_string(raw['cover'])),
           description: _plainText(raw['overview']),

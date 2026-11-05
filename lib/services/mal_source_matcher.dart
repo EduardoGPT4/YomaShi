@@ -95,7 +95,7 @@ class MalSourceMatcher {
             token.check();
             final matches = <String, OnlineMangaSummary>{};
             for (final item in result.items) {
-              final key = titleKey(item.title);
+              final key = titleKey(item.originalTitle ?? item.title);
               if (key.isNotEmpty && exact.contains(key)) {
                 matches.putIfAbsent(
                   item.url,

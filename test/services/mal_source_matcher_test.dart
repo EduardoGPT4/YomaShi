@@ -119,6 +119,36 @@ void main() {
     },
   );
 
+  test(
+    'uses the original source title when display cleanup hides a sequel number',
+    () async {
+      final summary = OnlineMangaSummary.fromMap(
+        const OnlineMangaSummary(
+          title: 'Obra principal',
+          originalTitle: 'Obra principal - 2',
+          url: '/sequel',
+        ).toMap(),
+      ).copyWith(sourceId: 'mangadex');
+      final matcher = MalSourceMatcher(
+        search: (id, query, page, size) async =>
+            CatalogPage(items: [summary], totalPages: 1),
+      );
+      expect((await matcher.findInSource(entry, 'mangadex')).items, isEmpty);
+      const sequel = MalManga(
+        id: 2,
+        title: 'Obra principal - 2',
+        chaptersRead: 0,
+        totalChapters: 0,
+        status: 'plan_to_read',
+        publishingStatus: '',
+      );
+      expect(
+        (await matcher.findInSource(sequel, 'mangadex')).items.single.url,
+        '/sequel',
+      );
+    },
+  );
+
   test('cancellation stops pagination and alias requests', () async {
     final token = CancellationToken();
     final gate = Completer<CatalogPage>();

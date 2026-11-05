@@ -410,12 +410,13 @@ class ManhwaWebService {
     if (slug.isEmpty) {
       return null;
     }
-    final title = TitleSanitizer.clean(
-      (map['name_esp'] ?? map['the_real_name'] ?? 'Manga').toString(),
-    );
+    final originalTitle = (map['name_esp'] ?? map['the_real_name'] ?? 'Manga')
+        .toString();
+    final title = TitleSanitizer.clean(originalTitle);
     final cover = map['_imagen']?.toString();
     return OnlineMangaSummary(
       title: title.isEmpty ? 'Manga' : title,
+      originalTitle: originalTitle,
       url: seriesUrl(slug),
       coverUrl: (cover != null && cover.startsWith('http')) ? cover : null,
       chapterCount: int.tryParse('${map['_numero_cap']}'),
@@ -429,12 +430,12 @@ class ManhwaWebService {
     if (slug.isEmpty) {
       return null;
     }
-    final title = TitleSanitizer.clean(
-      (map['name_manhwa'] ?? 'Manga').toString(),
-    );
+    final originalTitle = (map['name_manhwa'] ?? 'Manga').toString();
+    final title = TitleSanitizer.clean(originalTitle);
     final cover = map['img']?.toString();
     return OnlineMangaSummary(
       title: title.isEmpty ? 'Manga' : title,
+      originalTitle: originalTitle,
       url: seriesUrl(slug),
       coverUrl: (cover != null && cover.startsWith('http')) ? cover : null,
       type: _typeLabel(map['_tipo']?.toString()),

@@ -739,6 +739,7 @@ class TmoService {
       results.add(
         OnlineMangaSummary(
           title: TitleSanitizer.clean(title),
+          originalTitle: title,
           url: url,
           coverUrl: _absoluteUrl(cover),
           chapterCount: chapterCount,
