@@ -294,55 +294,44 @@ class _HomeScreenState extends State<HomeScreen> {
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
                   child: SizedBox(
                     height: actionHeight,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) => Row(
-                        children: [
-                          Expanded(
-                            child: SizedBox.expand(
-                              child: _SourceChip(
-                                source: source.isLoaded ? source.active : null,
-                                onTap: _openSources,
-                                shortLabel: true,
-                                maxLabelWidth:
-                                    ((constraints.maxWidth - 8) / 2 - 66)
-                                        .clamp(20.0, 118.0)
-                                        .toDouble(),
-                              ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox.expand(
+                            child: _SourceChip(
+                              source: source.isLoaded ? source.active : null,
+                              onTap: _openSources,
+                              shortLabel: true,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: SizedBox.expand(
-                              child: OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 8,
-                                  ),
-                                ),
-                                icon: const Icon(
-                                  Icons.bookmarks_outlined,
-                                  size: 18,
-                                ),
-                                label: const Text(
-                                  'Mangas MAL',
-                                  maxLines: 2,
-                                  textAlign: TextAlign.center,
-                                ),
-                                onPressed: () => Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => MalLibraryScreen(
-                                      client:
-                                          widget.malClient ??
-                                          MyAnimeListService.shared.client,
-                                    ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: SizedBox.expand(
+                            child: OutlinedButton.icon(
+                              style: _headerActionStyle(context),
+                              icon: const Icon(
+                                Icons.bookmarks_outlined,
+                                size: 18,
+                              ),
+                              label: const Text(
+                                'Mangas MAL',
+                                maxLines: 2,
+                                textAlign: TextAlign.center,
+                              ),
+                              onPressed: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => MalLibraryScreen(
+                                    client:
+                                        widget.malClient ??
+                                        MyAnimeListService.shared.client,
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -379,16 +368,25 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+ButtonStyle _headerActionStyle(BuildContext context) =>
+    OutlinedButton.styleFrom(
+      foregroundColor: Theme.of(context).colorScheme.primary,
+      textStyle: Theme.of(
+        context,
+      ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      alignment: Alignment.center,
+    );
+
 class _SourceChip extends StatelessWidget {
   final MangaSource? source;
   final VoidCallback onTap;
-  final double maxLabelWidth;
   final bool shortLabel;
 
   const _SourceChip({
     required this.source,
     required this.onTap,
-    this.maxLabelWidth = 118,
     this.shortLabel = false,
   });
 
@@ -399,6 +397,33 @@ class _SourceChip extends StatelessWidget {
     final label = loaded
         ? (shortLabel ? MangaSources.shortLabel(source!.id) : source!.name)
         : '…';
+
+    if (shortLabel) {
+      return Tooltip(
+        message: 'Cambiar fuente',
+        child: OutlinedButton.icon(
+          style: _headerActionStyle(context),
+          onPressed: onTap,
+          icon: Icon(source?.icon ?? Icons.public_rounded, size: 18),
+          label: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.expand_more_rounded, size: 18),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Tooltip(
       message: 'Cambiar fuente',
@@ -433,7 +458,7 @@ class _SourceChip extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxLabelWidth),
+                    constraints: const BoxConstraints(maxWidth: 118),
                     child: Text(
                       label,
                       maxLines: 1,
