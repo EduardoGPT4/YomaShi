@@ -83,7 +83,12 @@ void main() {
     }
   });
 
-  for (final mode in ['online-hitomi', 'online-inmanga', 'offline-hitomi']) {
+  for (final mode in [
+    'online-hitomi',
+    'online-hitomi-double',
+    'online-inmanga',
+    'offline-hitomi',
+  ]) {
     testWidgets(
       '$mode keeps five-page prefetch limited to its intended online reader',
       (tester) async {
@@ -97,6 +102,8 @@ void main() {
         final sourceId = mode.contains('inmanga') ? 'inmanga' : 'hitomi';
         final original = OnlineCatalogService.adapters[sourceId]!;
         final online = !mode.startsWith('offline');
+        final initialPage = mode == 'online-hitomi-double' ? 2 : 6;
+        final pageLabel = '${initialPage + 1}/12';
         final remote = List.generate(
           12,
           (i) => 'http://127.0.0.1:${server.port}/$mode/$i.png',
@@ -172,13 +179,21 @@ void main() {
                     ],
                   ),
                   initialChapterIndex: 0,
-                  initialPageIndex: 6,
+                  initialPageIndex: initialPage,
                 ),
               ),
             ),
           );
-          await waitFor(() => find.text('7/12').evaluate().isNotEmpty);
-          if (mode == 'online-hitomi') {
+          await waitFor(() => find.text(pageLabel).evaluate().isNotEmpty);
+          if (mode == 'online-hitomi-double') {
+            await waitFor(() => cached(7).existsSync());
+            expect(requested, isNot(contains('/$mode/8.png')));
+            await settings.setCoverAlone(false);
+            await settings.setDoublePage(true);
+            await tester.pump();
+            await waitFor(() => cached(8).existsSync());
+            expect(requested, isNot(contains('/$mode/9.png')));
+          } else if (mode == 'online-hitomi') {
             await waitFor(
               () =>
                   requested.contains('/$mode/7.png') &&
@@ -224,7 +239,7 @@ void main() {
                     .any((image) => image.image != null),
           );
           expect(reads.isRead(chapterPath), isFalse);
-          expect(find.text('7/12'), findsOneWidget);
+          expect(find.text(pageLabel), findsOneWidget);
           expect(tester.takeException(), isNull);
         } finally {
           for (final gate in gates.values) {

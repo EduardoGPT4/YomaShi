@@ -466,6 +466,7 @@ class _ReaderScreenState extends State<ReaderScreen>
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
         old.dispose();
+        if (mounted) _precacheVisiblePages();
       });
       _saveProgress();
     }
