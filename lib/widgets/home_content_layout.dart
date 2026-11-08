@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'app_metrics.dart';
 
 class HomeContentLayout {
-  static const String appVersion = '2.8.1';
+  static const String appVersion = '2.8.2';
 
   static EdgeInsets paddingOf(BuildContext context) =>
       AppMetrics.of(context).pagePadding;

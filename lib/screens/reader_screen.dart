@@ -6,6 +6,7 @@ import '../utils/app_failure.dart';
 import '../services/source_http_client.dart';
 import '../services/image_repository.dart';
 import '../services/repository_image.dart';
+import '../services/reader_page_prefetcher.dart';
 import '../utils/network_errors.dart';
 import '../widgets/webtoon_viewer.dart';
 import '../providers/download_queue_provider.dart';
@@ -65,6 +66,17 @@ class ReaderScreen extends StatefulWidget {
 class _ReaderScreenState extends State<ReaderScreen>
     with WidgetsBindingObserver {
   int _preloadRadius = 1;
+  bool _prefetchPaused = false;
+  late final _pagePrefetcher = ReaderPagePrefetcher(
+    load: (url) async {
+      await ImageRepository.shared.resolve(
+        url,
+        headers: OnlineCatalogService.imageRequestHeaders(url),
+      );
+    },
+    onError: (error) =>
+        debugPrint('Precarga de página: ${NetworkErrors.friendly(error)}'),
+  );
   DownloadQueueProvider? _queue;
   Timer? _readerHeartbeat;
   CancellationToken? _chapterCancellation;
@@ -227,6 +239,7 @@ class _ReaderScreenState extends State<ReaderScreen>
   @override
   void dispose() {
     _disposing = true;
+    _pagePrefetcher.dispose();
     unawaited(_translation.dispose().catchError((_) {}));
     _readerHeartbeat?.cancel();
     _queue?.setReaderActive(false);
@@ -291,6 +304,7 @@ class _ReaderScreenState extends State<ReaderScreen>
   }
 
   Future<void> _openChapter(int index, {int initialPage = 0}) async {
+    _pagePrefetcher.stop();
     _chapterCancellation?.cancel();
     final cancellation = CancellationToken();
     _chapterCancellation = cancellation;
@@ -479,10 +493,14 @@ class _ReaderScreenState extends State<ReaderScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _prefetchPaused = state != AppLifecycleState.resumed;
+    if (_prefetchPaused) _pagePrefetcher.stop();
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
       _saveProgress();
       unawaited(context.read<LibraryProvider>().flushStats());
+    } else if (state == AppLifecycleState.resumed) {
+      _precacheVisiblePages();
     }
   }
 
@@ -1687,8 +1705,34 @@ class _ReaderScreenState extends State<ReaderScreen>
   }
 
   void _precacheVisiblePages() {
-    if (!mounted || _pages.isEmpty) return;
+    if (!mounted || _loadingChapter || _pages.isEmpty) return;
     final chapter = _currentChapter?.path;
+    final sourceId =
+        OnlineCatalogService.sourceIdForRef(
+          _currentChapter?.sourceUrl ?? chapter,
+        ) ??
+        OnlineCatalogService.sourceIdForRef(
+          widget.manga.sourceUrl ?? widget.manga.path,
+        );
+    if (!_prefetchPaused &&
+        chapter != null &&
+        _isRemotePath(chapter) &&
+        sourceId == 'hitomi') {
+      final settings = context.read<ReaderSettingsProvider>();
+      final visibleCount =
+          _useDoublePage(settings) && !(settings.coverAlone && _pageIndex == 0)
+          ? 2
+          : 1;
+      _pagePrefetcher.update(
+        _pages,
+        currentPage: (_pageIndex + visibleCount - 1).clamp(
+          0,
+          _pages.length - 1,
+        ),
+      );
+    } else {
+      _pagePrefetcher.stop();
+    }
     if (_preloadRadius > 0) {
       _preloadRadius =
           PaintingBinding.instance.imageCache.currentSizeBytes >
