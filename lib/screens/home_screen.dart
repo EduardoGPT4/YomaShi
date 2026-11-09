@@ -284,7 +284,18 @@ class _HomeScreenState extends State<HomeScreen> {
         title: GestureDetector(
           onTap: () => _showQuickStatsSheet(theme, library),
           behavior: HitTestBehavior.opaque,
-          child: const Text('YomaShi'),
+          child: Image.asset(
+            'assets/brand/yomashi_wordmark.png',
+            semanticLabel: 'YomaShi',
+            width: 144,
+            height: 48,
+            fit: BoxFit.contain,
+            alignment: Alignment.centerLeft,
+            color: theme.colorScheme.onSurface,
+            colorBlendMode: BlendMode.srcIn,
+            cacheWidth: 576,
+            filterQuality: FilterQuality.medium,
+          ),
         ),
         centerTitle: false,
         bottom: linked

@@ -1,7 +1,7 @@
 name: yomashi
 description: "lector de manga"
 publish_to: 'none'
-version: 2.8.2+15
+version: 2.8.3+16
 
 environment:
   sdk: ^3.10.7
@@ -41,20 +41,23 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/app_icon.jpg
+    - assets/brand/yomashi_wordmark.png
     - assets/google_logo.png
 
 flutter_launcher_icons:
   android: true
   ios: false
-  image_path: "assets/app_icon.jpg"
+  image_path: "assets/brand/app_icon.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/brand/app_icon.png"
+  adaptive_icon_foreground_inset: 16
   web:
     generate: true
-    image_path: "assets/app_icon.jpg"
+    image_path: "assets/brand/app_icon.png"
   windows:
     generate: true
-    image_path: "assets/app_icon.jpg"
+    image_path: "assets/brand/app_icon.png"
     icon_size: 256
   macos:
     generate: true
-    image_path: "assets/app_icon.jpg"
+    image_path: "assets/brand/app_icon.png"

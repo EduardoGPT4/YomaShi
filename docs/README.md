@@ -3,7 +3,7 @@
 | Carpeta | Contenido |
 | --- | --- |
 | `architecture/` | [Arquitectura y flujos de datos](architecture/ESTRUCTURA.md) y [configuración de exclusiones](architecture/EXCLUSIONES.md). |
-| `design/` | [Diseño visual y componentes](design/DISENO_VISUAL.md). |
+| `design/` | [Diseño visual y componentes](design/DISENO_VISUAL.md) y [recursos de marca](design/MARCA_YOMASHI.md). |
 | `reader/` | [Traducción de imágenes online](reader/TRADUCCION_LECTOR.md). |
 | `releases/` | Implementación del informe e historial de mejoras. |
 | `testing/` | [Resultados de las pruebas en teléfono](testing/PRUEBAS_TELEFONO.md). |
